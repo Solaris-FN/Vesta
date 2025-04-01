@@ -19,7 +19,6 @@ func SendMessage(ws *websocket.Conn, msg map[string]interface{}) error {
 		log.Printf("WebSocket write error: %v", err)
 		return err
 	}
-	LogSuccess("Sent message: %s", jsonMsg)
 
 	return nil
 }
