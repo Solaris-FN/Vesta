@@ -11,10 +11,10 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func handleConnection(ws *websocket.Conn, ticketId string, client Client) error {
+func HandleStates(client Client, ticketId string) error {
 	db := database.Get()
 	var session entities.Session
-	result := db.Where("region = ? AND playlist = ? AND version = ?", client.Payload.Region, client.Payload.Playlist, client.Payload.Version).First(&session)
+	result := db.Where("region = ? AND playlist = ? AND version = ? AND accessible = ?", client.Payload.Region, client.Payload.Playlist, client.Payload.Version, true).First(&session)
 	if result.Error != nil {
 		if result.Error.Error() == "record not found" {
 			log.Printf("Session not found for region: %s, playlist: %s, version: %s", client.Payload.Region, client.Payload.Playlist, client.Payload.Version)
@@ -26,7 +26,7 @@ func handleConnection(ws *websocket.Conn, ticketId string, client Client) error 
 
 		if session.Available {
 			time.Sleep(500 * time.Millisecond)
-			if err := messages.SendJoin(ws, session.Session, session.Session); err != nil {
+			if err := messages.SendJoin(client.Conn, session.Session, session.Session); err != nil {
 				utils.LogError("Failed to send join: %v", err)
 			}
 		}
@@ -44,7 +44,7 @@ func handleConnection(ws *websocket.Conn, ticketId string, client Client) error 
 	go func() {
 		defer func() { done <- struct{}{} }()
 		for {
-			_, _, err := ws.ReadMessage()
+			_, _, err := client.Conn.ReadMessage()
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 					log.Printf("read error: %v", err)
@@ -54,23 +54,33 @@ func handleConnection(ws *websocket.Conn, ticketId string, client Client) error 
 		}
 	}()
 
-	lastSentCount := getClientCount()
+	lastSentCount := GetAllClientsViaDataLen(
+		client.Payload.Version,
+		client.Payload.Playlist,
+		client.Payload.Region,
+	)
 
 	for {
 		select {
 		case <-done:
 			return nil
 		case <-pingTicker.C:
-			if err := ws.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second)); err != nil {
+			if err := client.Conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(10*time.Second)); err != nil {
 				return err
 			}
 		case <-queueTicker.C:
-			currentCount := getClientCount()
-			if currentCount != lastSentCount {
-				if err := messages.SendQueued(ws, ticketId, currentCount); err != nil {
-					return err
+			if result.Error == nil {
+				currentCount := GetAllClientsViaDataLen(
+					client.Payload.Version,
+					client.Payload.Playlist,
+					client.Payload.Region,
+				)
+				if currentCount != lastSentCount {
+					if err := messages.SendQueued(client.Conn, ticketId, currentCount); err != nil {
+						return err
+					}
+					lastSentCount = currentCount
 				}
-				lastSentCount = currentCount
 			}
 		}
 	}

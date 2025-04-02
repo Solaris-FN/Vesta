@@ -116,7 +116,7 @@ func HandleWebSocket(c *gin.Context) {
 
 	clientM.Lock()
 	clients[client] = true
-	currentCount := len(clients)
+	currentCount := GetAllClientsViaDataLen(client.Payload.Version, client.Payload.Playlist, client.Payload.Region)
 	clientM.Unlock()
 
 	utils.LogSuccess("connection!")
@@ -129,7 +129,7 @@ func HandleWebSocket(c *gin.Context) {
 		return
 	}
 
-	if err := handleConnection(ws, ticketID, *client); err != nil {
+	if err := HandleStates(*client, ticketID); err != nil {
 		log.Printf("handling failed: %v", err)
 	}
 

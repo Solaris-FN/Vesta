@@ -72,7 +72,11 @@ func PostCreateSession(c *gin.Context) {
 
 	db.Create(&newSession)
 
-	for _, client := range handlers.GetAllClientsViaData(body.Version, body.Playlist, body.Region) {
+	for _, client := range handlers.GetAllClientsViaData(
+		body.Version,
+		body.Playlist,
+		body.Region,
+	) {
 		if err := messages.SendSessionAssignment(client.Conn, newSession.Session); err != nil {
 			utils.LogError("Failed to send session assignment: %v", err)
 		}
@@ -95,7 +99,11 @@ func PostStartSession(c *gin.Context) {
 	session.Available = true
 	db.Save(&session)
 
-	for _, client := range handlers.GetAllClientsViaData(session.Version, session.PlaylistName, session.Region) {
+	for _, client := range handlers.GetAllClientsViaData(
+		session.Version,
+		session.PlaylistName,
+		session.Region,
+	) {
 		log.Printf("Sending session assignment to client: %s", client.Conn.RemoteAddr())
 		if err := messages.SendJoin(client.Conn, session.Session, session.Session); err != nil {
 			utils.LogError("Failed to send join: %v", err)

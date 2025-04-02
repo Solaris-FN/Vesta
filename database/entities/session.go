@@ -21,6 +21,7 @@ type Session struct {
 	Stats          bool           `gorm:"column:stats"`
 	Available      bool           `gorm:"column:available"`
 	Version        string         `gorm:"column:version"`
+	Accessible         bool          `gorm:"column:accessible"`
 }
 
 func (Session) TableName() string {
