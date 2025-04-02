@@ -68,6 +68,7 @@ func PostCreateSession(c *gin.Context) {
 		Stats:          body.Stats,
 		Available:      false,
 		Version:        body.Version,
+		Accessible:     true,
 	}
 
 	db.Create(&newSession)
@@ -125,6 +126,7 @@ func PostCloseSession(c *gin.Context) {
 	}
 
 	session.Available = false
+	session.Accessible = false
 	db.Save(&session)
 
 	c.JSON(200, &session)
@@ -135,13 +137,10 @@ func DeleteSession(c *gin.Context) {
 
 	db := database.Get()
 
-	var session entities.Session
-	if err := db.Where("session = ?", id).First(&session).Error; err != nil {
-		c.JSON(404, gin.H{"err": "Session not found"})
+	if err := db.Exec("DELETE FROM sessions WHERE session = ?", id).Error; err != nil {
+		c.JSON(404, gin.H{"err": "Session not found or failed to delete"})
 		return
 	}
-
-	db.Delete(&session)
 
 	c.JSON(204, nil)
 }

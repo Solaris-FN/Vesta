@@ -16,8 +16,8 @@ func HandleStates(client Client, ticketId string) error {
 	var session entities.Session
 	result := db.Where("region = ? AND playlist = ? AND version = ? AND accessible = ?", client.Payload.Region, client.Payload.Playlist, client.Payload.Version, true).First(&session)
 	if result.Error != nil {
-		if result.Error.Error() == "record not found" {
-			log.Printf("Session not found for region: %s, playlist: %s, version: %s", client.Payload.Region, client.Payload.Playlist, client.Payload.Version)
+		if result.Error.Error() != "record not found" {
+			log.Printf("Error fetching session: %v", result.Error)
 		}
 	} else {
 		if err := messages.SendSessionAssignment(client.Conn, session.Session); err != nil {

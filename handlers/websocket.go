@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -31,7 +32,9 @@ type Client struct {
 
 var (
 	upgrader = websocket.Upgrader{
-		CheckOrigin:     func(r *http.Request) bool { return true },
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 	}
@@ -45,7 +48,6 @@ func HandleWebSocket(c *gin.Context) {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
-		log.Printf("upgrade failed: %v", err)
 		return
 	}
 
@@ -65,63 +67,76 @@ func HandleWebSocket(c *gin.Context) {
 
 	const JWT_SECRET = "vmkt7lob4n0purvn7n96c3tk8vb5o2a4hu1a8fqisa1xx718bx808ns5si1jhm98qlycpzk8us0b57j8gt5td1c42c1us9ww"
 	token := authParts[2] + "." + strings.SplitN(authParts[3], " ", 2)[0]
-	payload, err := utils.VerifyJWT(token, JWT_SECRET)
-	client := &Client{
-		Conn: ws,
-	}
-	if bucketID, ok := payload["bucketId"].(string); ok {
-		client.Payload.BucketID = bucketID
-	}
-	if buildUniqueID, ok := payload["buildUniqueId"].(string); ok {
-		client.Payload.BuildUniqueID = buildUniqueID
-	}
-	if exp, ok := payload["exp"].(int64); ok {
-		client.Payload.Exp = exp
-	}
-	if fillTeam, ok := payload["fillTeam"].(string); ok {
-		client.Payload.FillTeam = fillTeam
-	}
-	if iat, ok := payload["iat"].(int64); ok {
-		client.Payload.Iat = iat
-	}
-	if jti, ok := payload["jti"].(string); ok {
-		client.Payload.Jti = jti
-	}
-	if partyPlayerIDs, ok := payload["partyPlayerIds"].(string); ok {
-		client.Payload.PartyPlayerIDs = partyPlayerIDs
-	}
-	if playlist, ok := payload["playlist"].(string); ok {
-		client.Payload.Playlist = playlist
-	}
-	if region, ok := payload["region"].(string); ok {
-		client.Payload.Region = region
-	}
-	if version, ok := payload["version"].(string); ok {
-		client.Payload.Version = version
-	}
 
+	payload, err := utils.VerifyJWT(token, JWT_SECRET)
 	if err != nil {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		ws.Close()
 		return
 	}
 
+	client := &Client{
+		Conn: ws,
+	}
+
+	if bucketID, ok := payload["bucketId"].(string); ok {
+		client.Payload.BucketID = bucketID
+	}
+
+	if buildUniqueID, ok := payload["buildUniqueId"].(string); ok {
+		client.Payload.BuildUniqueID = buildUniqueID
+	}
+
+	if exp, ok := payload["exp"].(float64); ok {
+		client.Payload.Exp = int64(exp)
+	}
+
+	if fillTeam, ok := payload["fillTeam"].(string); ok {
+		client.Payload.FillTeam = fillTeam
+	}
+
+	if iat, ok := payload["iat"].(float64); ok {
+		client.Payload.Iat = int64(iat)
+	}
+
+	if jti, ok := payload["jti"].(string); ok {
+		client.Payload.Jti = jti
+	}
+
+	if partyPlayerIDs, ok := payload["partyPlayerIds"].(string); ok {
+		client.Payload.PartyPlayerIDs = partyPlayerIDs
+	}
+
+	if playlist, ok := payload["playlist"].(string); ok {
+		client.Payload.Playlist = playlist
+	}
+
+	if region, ok := payload["region"].(string); ok {
+		client.Payload.Region = region
+	}
+
+	if version, ok := payload["version"].(string); ok {
+		client.Payload.Version = version
+	}
+
 	ws.SetReadLimit(512)
 	ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 	ws.SetPongHandler(func(string) error {
 		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
-		clients[client] = true
 		return nil
 	})
 
 	clientM.Lock()
 	clients[client] = true
-	currentCount := GetAllClientsViaDataLen(client.Payload.Version, client.Payload.Playlist, client.Payload.Region)
 	clientM.Unlock()
+	currentCount := GetAllClientsViaDataLen(client.Payload.Version, client.Payload.Playlist, client.Payload.Region)
 
-	utils.LogSuccess("connection!")
+	utils.LogSuccess("%s", fmt.Sprintf("Connection established from %s! Current count: %d", r.RemoteAddr, currentCount))
+
 	ticketID := strings.ReplaceAll(uuid.New().String(), "-", "")
+
 	if err := sendInitMessages(ws, ticketID, currentCount); err != nil {
+		log.Printf("Failed to send init messages: %v", err)
 		clientM.Lock()
 		delete(clients, client)
 		clientM.Unlock()
@@ -130,12 +145,13 @@ func HandleWebSocket(c *gin.Context) {
 	}
 
 	if err := HandleStates(*client, ticketID); err != nil {
-		log.Printf("handling failed: %v", err)
+		log.Printf("HandleStates failed: %v", err)
 	}
 
 	clientM.Lock()
 	delete(clients, client)
 	clientM.Unlock()
 	ws.Close()
-	utils.LogInfo("disconnection!")
+
+	utils.LogInfo("%s", fmt.Sprintf("Client disconnected from %s!", r.RemoteAddr))
 }
