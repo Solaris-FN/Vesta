@@ -26,7 +26,32 @@ var (
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		http.Error(w, "Failed to upgrade to WebSocket", http.StatusInternalServerError)
 		log.Printf("upgrade failed: %v", err)
+		return
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		http.Error(w, "Error, Data not signed correctly!", http.StatusUnauthorized)
+		ws.Close()
+		return
+	}
+
+	authParts := strings.SplitN(authHeader, " ", 4)
+	if len(authParts) != 4 || authParts[0] != "Epic-Signed" || authParts[1] != "Vesta" {
+		http.Error(w, "Error, Data not signed correctly!", http.StatusUnauthorized)
+		ws.Close()
+		return
+	}
+
+	const JWT_SECRET = "vmkt7lob4n0purvn7n96c3tk8vb5o2a4hu1a8fqisa1xx718bx808ns5si1jhm98qlycpzk8us0b57j8gt5td1c42c1us9ww"
+	token := authParts[2] + "." + strings.SplitN(authParts[3], " ", 2)[0]
+
+	_, err = utils.VerifyJWT(token, JWT_SECRET)
+	if err != nil {
+		http.Error(w, "Error, Data not signed correctly!", http.StatusUnauthorized)
+		ws.Close()
 		return
 	}
 
