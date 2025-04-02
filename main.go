@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"vesta/database"
 	"vesta/database/entities"
 	"vesta/handlers"
@@ -12,6 +13,7 @@ import (
 )
 
 func main() {
+	log.SetFlags(0)
 	db, err := database.Init()
 	if err != nil {
 		color.Red("Failed to connect to database: %v", err)
@@ -19,7 +21,7 @@ func main() {
 
 	gin.SetMode(gin.ReleaseMode)
 
-	db.AutoMigrate(&entities.Session{})
+	db.AutoMigrate(&entities.Session{}, &entities.Player{})
 
 	router := gin.Default()
 
