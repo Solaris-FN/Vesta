@@ -3,12 +3,35 @@ package handlers
 import (
 	"log"
 	"time"
+	"vesta/database"
+	"vesta/database/entities"
 	"vesta/messages"
+	"vesta/utils"
 
 	"github.com/gorilla/websocket"
 )
 
-func handleConnection(ws *websocket.Conn, ticketId string) error {
+func handleConnection(ws *websocket.Conn, ticketId string, client Client) error {
+	db := database.Get()
+	var session entities.Session
+	result := db.Where("region = ? AND playlist = ? AND version = ?", client.Payload.Region, client.Payload.Playlist, client.Payload.Version).First(&session)
+	if result.Error != nil {
+		if result.Error.Error() == "record not found" {
+			log.Printf("Session not found for region: %s, playlist: %s, version: %s", client.Payload.Region, client.Payload.Playlist, client.Payload.Version)
+		}
+	} else {
+		if err := messages.SendSessionAssignment(client.Conn, session.Session); err != nil {
+			utils.LogError("Failed to send session assignment: %v", err)
+		}
+
+		if session.Available {
+			time.Sleep(500 * time.Millisecond)
+			if err := messages.SendJoin(ws, session.Session, session.Session); err != nil {
+				utils.LogError("Failed to send join: %v", err)
+			}
+		}
+	}
+
 	pingTicker := time.NewTicker(30 * time.Second)
 	defer pingTicker.Stop()
 

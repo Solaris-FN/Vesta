@@ -24,7 +24,11 @@ func VerifyJWT(tokenString, secret string) (map[string]any, error) {
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return claims, nil
+		payload := make(map[string]any)
+		for key, value := range claims {
+			payload[key] = value
+		}
+		return payload, nil
 	}
 
 	return nil, errors.New("invalid token")

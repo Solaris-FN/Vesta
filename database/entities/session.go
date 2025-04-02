@@ -10,7 +10,7 @@ type Session struct {
 	Session        string         `gorm:"column:session;primaryKey"`
 	PlaylistName   string         `gorm:"column:playlist"`
 	ServerAddr     string         `gorm:"column:server_addr"`
-	ServerPort     string         `gorm:"column:server_port"`
+	ServerPort     int            `gorm:"column:server_port"`
 	ActivePlayers  int            `gorm:"column:active_players"`
 	AllPlayers     int            `gorm:"column:all_players"`
 	Region         string         `gorm:"column:region"`
@@ -20,6 +20,7 @@ type Session struct {
 	JoinInProgress bool           `gorm:"column:join_in_progress"`
 	Stats          bool           `gorm:"column:stats"`
 	Available      bool           `gorm:"column:available"`
+	Version        string         `gorm:"column:version"`
 }
 
 func (Session) TableName() string {

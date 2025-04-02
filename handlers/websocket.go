@@ -13,13 +13,29 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type Client struct {
+	Conn    *websocket.Conn
+	Payload struct {
+		BucketID       string `json:"bucketId"`
+		BuildUniqueID  string `json:"buildUniqueId"`
+		Exp            int64  `json:"exp"`
+		FillTeam       string `json:"fillTeam"`
+		Iat            int64  `json:"iat"`
+		Jti            string `json:"jti"`
+		PartyPlayerIDs string `json:"partyPlayerIds"`
+		Playlist       string `json:"playlist"`
+		Region         string `json:"region"`
+		Version        string `json:"version"`
+	}
+}
+
 var (
 	upgrader = websocket.Upgrader{
 		CheckOrigin:     func(r *http.Request) bool { return true },
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 	}
-	clients = make(map[*websocket.Conn]bool)
+	clients = make(map[*Client]bool)
 	clientM sync.RWMutex
 )
 
@@ -49,7 +65,41 @@ func HandleWebSocket(c *gin.Context) {
 
 	const JWT_SECRET = "vmkt7lob4n0purvn7n96c3tk8vb5o2a4hu1a8fqisa1xx718bx808ns5si1jhm98qlycpzk8us0b57j8gt5td1c42c1us9ww"
 	token := authParts[2] + "." + strings.SplitN(authParts[3], " ", 2)[0]
-	_, err = utils.VerifyJWT(token, JWT_SECRET)
+	payload, err := utils.VerifyJWT(token, JWT_SECRET)
+	client := &Client{
+		Conn: ws,
+	}
+	if bucketID, ok := payload["bucketId"].(string); ok {
+		client.Payload.BucketID = bucketID
+	}
+	if buildUniqueID, ok := payload["buildUniqueId"].(string); ok {
+		client.Payload.BuildUniqueID = buildUniqueID
+	}
+	if exp, ok := payload["exp"].(int64); ok {
+		client.Payload.Exp = exp
+	}
+	if fillTeam, ok := payload["fillTeam"].(string); ok {
+		client.Payload.FillTeam = fillTeam
+	}
+	if iat, ok := payload["iat"].(int64); ok {
+		client.Payload.Iat = iat
+	}
+	if jti, ok := payload["jti"].(string); ok {
+		client.Payload.Jti = jti
+	}
+	if partyPlayerIDs, ok := payload["partyPlayerIds"].(string); ok {
+		client.Payload.PartyPlayerIDs = partyPlayerIDs
+	}
+	if playlist, ok := payload["playlist"].(string); ok {
+		client.Payload.Playlist = playlist
+	}
+	if region, ok := payload["region"].(string); ok {
+		client.Payload.Region = region
+	}
+	if version, ok := payload["version"].(string); ok {
+		client.Payload.Version = version
+	}
+
 	if err != nil {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		ws.Close()
@@ -60,31 +110,31 @@ func HandleWebSocket(c *gin.Context) {
 	ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 	ws.SetPongHandler(func(string) error {
 		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+		clients[client] = true
 		return nil
 	})
 
 	clientM.Lock()
-	clients[ws] = true
+	clients[client] = true
 	currentCount := len(clients)
 	clientM.Unlock()
 
 	utils.LogSuccess("connection!")
-
 	ticketID := strings.ReplaceAll(uuid.New().String(), "-", "")
 	if err := sendInitMessages(ws, ticketID, currentCount); err != nil {
 		clientM.Lock()
-		delete(clients, ws)
+		delete(clients, client)
 		clientM.Unlock()
 		ws.Close()
 		return
 	}
 
-	if err := handleConnection(ws, ticketID); err != nil {
+	if err := handleConnection(ws, ticketID, *client); err != nil {
 		log.Printf("handling failed: %v", err)
 	}
 
 	clientM.Lock()
-	delete(clients, ws)
+	delete(clients, client)
 	clientM.Unlock()
 	ws.Close()
 	utils.LogInfo("disconnection!")

@@ -5,6 +5,7 @@ import (
 	"vesta/database"
 	"vesta/database/entities"
 	"vesta/handlers"
+	managers "vesta/manager"
 	"vesta/utils"
 
 	"github.com/fatih/color"
@@ -25,6 +26,15 @@ func main() {
 	router := gin.Default()
 
 	router.GET("/vesta/conn", handlers.HandleWebSocket)
+
+	Session := router.Group("/solaris/api/server")
+	{
+		Session.POST("/session", managers.PostCreateSession)
+		Session.POST("/session/:id/start", managers.PostStartSession)
+		Session.POST("/session/:id/close", managers.PostCloseSession)
+		Session.DELETE("/session/:id", managers.DeleteSession)
+	}
+
 	serverAddr := ":8443"
 	utils.LogWithTimestamp(color.BlueString, true, "%s", "Vesta started on port "+serverAddr)
 
