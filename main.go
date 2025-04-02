@@ -24,10 +24,7 @@ func main() {
 
 	router := gin.Default()
 
-	router.GET("/vesta/conn", func(c *gin.Context) {
-		handlers.HandleWebSocket(c)
-	})
-
+	router.GET("/vesta/conn", handlers.HandleWebSocket)
 	serverAddr := ":8443"
 	utils.LogWithTimestamp(color.BlueString, true, "%s", "Vesta started on port "+serverAddr)
 
