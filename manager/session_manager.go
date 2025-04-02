@@ -73,16 +73,6 @@ func PostCreateSession(c *gin.Context) {
 
 	db.Create(&newSession)
 
-	for _, client := range handlers.GetAllClientsViaData(
-		body.Version,
-		body.Playlist,
-		body.Region,
-	) {
-		if err := messages.SendSessionAssignment(client.Conn, newSession.Session); err != nil {
-			utils.LogError("Failed to send session assignment: %v", err)
-		}
-	}
-
 	c.JSON(200, &newSession)
 }
 

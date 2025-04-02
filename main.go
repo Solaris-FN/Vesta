@@ -30,6 +30,7 @@ func main() {
 	Session := router.Group("/solaris/api/server")
 	{
 		Session.POST("/session", managers.PostCreateSession)
+		Session.GET("/session/:id/playlist", handlers.HandlePlaylistSelection)
 		Session.POST("/session/:id/start", managers.PostStartSession)
 		Session.POST("/session/:id/close", managers.PostCloseSession)
 		Session.DELETE("/session/:id", managers.DeleteSession)
