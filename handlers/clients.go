@@ -4,12 +4,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func getClientCount() int {
-	clientM.RLock()
-	defer clientM.RUnlock()
-	return len(clients)
-}
-
 func GetAllClients() []*websocket.Conn {
 	clientM.RLock()
 	defer clientM.RUnlock()
