@@ -1,16 +1,14 @@
 package main
 
 import (
-	"io"
 	"log"
-	"net/http"
-
 	"vesta/database"
 	"vesta/database/entities"
 	"vesta/handlers"
 	"vesta/utils"
 
 	"github.com/fatih/color"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -20,18 +18,20 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
+	gin.SetMode(gin.ReleaseMode)
+
 	db.AutoMigrate(&entities.Session{})
 
-	http.HandleFunc("/vesta/conn", handlers.HandleWebSocket)
+	router := gin.Default()
 
-	server := &http.Server{
-		Addr:     ":8443",
-		ErrorLog: log.New(io.Discard, "", 0),
-	}
+	router.GET("/vesta/conn", func(c *gin.Context) {
+		handlers.HandleWebSocket(c)
+	})
 
-	utils.LogWithTimestamp(color.BlueString, true, "%s", "Vesta started on port "+server.Addr)
+	serverAddr := ":8443"
+	utils.LogWithTimestamp(color.BlueString, true, "%s", "Vesta started on port "+serverAddr)
 
-	if err := server.ListenAndServe(); err != nil {
+	if err := router.Run(serverAddr); err != nil {
 		utils.LogWithTimestamp(color.RedString, false, "Error starting server: %v", err)
 	}
 }

@@ -19,6 +19,7 @@ type Session struct {
 	Attributes     string         `gorm:"column:attributes"`
 	JoinInProgress bool           `gorm:"column:join_in_progress"`
 	Stats          bool           `gorm:"column:stats"`
+	Available      bool           `gorm:"column:available"`
 }
 
 func (Session) TableName() string {
