@@ -95,7 +95,7 @@ func PostStartSession(c *gin.Context) {
 		session.PlaylistName,
 		session.Region,
 	) {
-		log.Printf("Sending session assignment to client: %s", client.Conn.RemoteAddr())
+		log.Printf("Sending session join to client: %s", client.Conn.RemoteAddr())
 		if err := messages.SendJoin(client.Conn, session.Session, session.Session); err != nil {
 			utils.LogError("Failed to send join: %v", err)
 		}
@@ -118,6 +118,21 @@ func PostCloseSession(c *gin.Context) {
 	session.Available = false
 	session.Accessible = false
 	db.Save(&session)
+
+	for _, client := range handlers.GetAllClientsViaData(
+		session.Version,
+		session.PlaylistName,
+		session.Region,
+	) {
+		log.Printf("Sending queued to client: %s", client.Conn.RemoteAddr())
+		if err := messages.SendQueued(client.Conn, strings.ReplaceAll(uuid.New().String(), "-", ""), handlers.GetAllClientsViaDataLen(
+			session.Version,
+			session.PlaylistName,
+			session.Region,
+		)); err != nil {
+			utils.LogError("Failed to send queued: %v", err)
+		}
+	}
 
 	c.JSON(200, &session)
 }

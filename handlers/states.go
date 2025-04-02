@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log"
+	"strings"
 	"time"
 	"vesta/database"
 	"vesta/database/entities"
@@ -9,6 +10,7 @@ import (
 	"vesta/utils"
 
 	"github.com/gorilla/websocket"
+	"github.com/lib/pq"
 )
 
 func HandleStates(client Client, ticketId string) error {
@@ -20,6 +22,16 @@ func HandleStates(client Client, ticketId string) error {
 			log.Printf("Error fetching session: %v", result.Error)
 		}
 	} else {
+		newPlayer := entities.Player{
+			AccountID: client.Payload.AccountID,
+			Session:   session.Session,
+			Team:      pq.StringArray(strings.Split(client.Payload.PartyPlayerIDs, ",")),
+		}
+
+		if err := db.Create(&newPlayer).Error; err != nil {
+			utils.LogError("Failed to create player: %v", err)
+		}
+
 		if err := messages.SendSessionAssignment(client.Conn, session.Session); err != nil {
 			utils.LogError("Failed to send session assignment: %v", err)
 		}

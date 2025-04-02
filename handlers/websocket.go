@@ -17,6 +17,7 @@ import (
 type Client struct {
 	Conn    *websocket.Conn
 	Payload struct {
+		AccountID      string `json:"accountId"`
 		BucketID       string `json:"bucketId"`
 		BuildUniqueID  string `json:"buildUniqueId"`
 		Exp            int64  `json:"exp"`
@@ -117,6 +118,10 @@ func HandleWebSocket(c *gin.Context) {
 
 	if version, ok := payload["version"].(string); ok {
 		client.Payload.Version = version
+	}
+
+	if accountID, ok := payload["accountId"].(string); ok {
+		client.Payload.AccountID = accountID
 	}
 
 	ws.SetReadLimit(512)

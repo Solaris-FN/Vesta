@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"strings"
 	"vesta/database"
 	"vesta/database/entities"
 	"vesta/messages"
 	"vesta/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
 )
 
 var lastSelectedPlaylist = make(map[string]string)
@@ -111,6 +113,15 @@ func HandlePlaylistSelection(c *gin.Context) {
 				metric.Playlist,
 				session.Region,
 			) {
+				newPlayer := entities.Player{
+					AccountID: client.Payload.AccountID,
+					Session:   session.Session,
+					Team:      pq.StringArray(strings.Split(client.Payload.PartyPlayerIDs, ",")),
+				}
+				if err := db.Create(&newPlayer).Error; err != nil {
+					utils.LogError("Failed to create player: %v", err)
+				}
+
 				if err := messages.SendSessionAssignment(client.Conn, id); err != nil {
 					utils.LogError("Failed to send session assignment: %v", err)
 				}
