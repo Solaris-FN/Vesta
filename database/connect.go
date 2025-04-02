@@ -17,11 +17,14 @@ var DB *gorm.DB
 
 func Init() (*gorm.DB, error) {
 	args := os.Args
-	connStr := ""
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "-db=") {
-			connStr = strings.TrimPrefix(arg, "-db=")
-			break
+	connStr := os.Getenv("DATABASE_URL")
+
+	if connStr == "" {
+		for _, arg := range args {
+			if strings.HasPrefix(arg, "-db=") {
+				connStr = strings.TrimPrefix(arg, "-db=")
+				break
+			}
 		}
 	}
 
