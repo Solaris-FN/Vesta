@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"vesta/database"
 	"vesta/database/entities"
 	"vesta/handlers"
@@ -16,7 +15,6 @@ func main() {
 	db, err := database.Init()
 	if err != nil {
 		color.Red("Failed to connect to database: %v", err)
-		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
 	gin.SetMode(gin.ReleaseMode)
