@@ -54,7 +54,7 @@ func Init() (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to ping database: %v", err)
 	}
 
-	utils.LogWithTimestamp(color.BlueString, false, "Connected to database")
+	utils.LogWithTimestamp(color.BlueString, "Connected to database")
 	DB = db
 	return db, nil
 }

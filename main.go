@@ -37,9 +37,9 @@ func main() {
 	}
 
 	serverAddr := ":8443"
-	utils.LogWithTimestamp(color.BlueString, true, "%s", "Vesta started on port "+serverAddr)
+	utils.LogWithTimestamp(color.BlueString, "%s", "Vesta started on port "+serverAddr)
 
 	if err := router.Run(serverAddr); err != nil {
-		utils.LogWithTimestamp(color.RedString, false, "Error starting server: %v", err)
+		utils.LogWithTimestamp(color.RedString, "Error starting server: %v", err)
 	}
 }
