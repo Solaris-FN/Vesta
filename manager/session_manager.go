@@ -142,7 +142,7 @@ func DeleteSession(c *gin.Context) {
 
 	db := database.Get()
 
-	if err := db.Exec("DELETE FROM sessions WHERE session = ?", id).Error; err != nil {
+	if err := db.Exec("DELETE FROM vesta_sessions WHERE session = ?", id).Error; err != nil {
 		c.JSON(404, gin.H{"err": "Session not found or failed to delete"})
 		return
 	}

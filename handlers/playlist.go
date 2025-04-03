@@ -126,9 +126,10 @@ func HandlePlaylistSelection(c *gin.Context) {
 					utils.LogError("Failed to send session assignment: %v", err)
 				}
 			}
+			//				"Playlist": strings.Replace(metric.Playlist, "playlist_", "", 1),
 
 			c.JSON(200, gin.H{
-				"Playlist": metric.Playlist,
+				"Playlist": strings.Replace(metric.Playlist, "playlist_", "", 1),
 				"Status":   "OK",
 			})
 			return
