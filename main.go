@@ -23,7 +23,7 @@ func main() {
 
 	db.AutoMigrate(&entities.Session{}, &entities.Player{})
 
-	router := gin.New() // use gin.Default() if you want a more verbose vesta server
+	router := gin.Default() // use gin.Default() if you want a more verbose vesta server
 
 	router.GET("/vesta/conn", handlers.HandleWebSocket)
 
@@ -40,7 +40,13 @@ func main() {
 	serverAddr := ":8443"
 	utils.LogWithTimestamp(color.BlueString, "%s", "Vesta started on port "+serverAddr)
 
-	if err := router.RunTLS(serverAddr, "static/RootCA.key", "static/RootCA.pem"); err != nil {
-		utils.LogWithTimestamp(color.RedString, "Error starting server: %v", err)
+	go func() {
+		if err := router.RunTLS(serverAddr, "static/RootCA.key", "static/RootCA.pem"); err != nil {
+			utils.LogWithTimestamp(color.RedString, "Error starting TLS server: %v", err)
+		}
+	}()
+
+	if err := router.Run(":21921"); err != nil {
+		utils.LogWithTimestamp(color.RedString, "Error starting HTTP server: %v", err)
 	}
 }
