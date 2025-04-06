@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"strings"
 	"vesta/database"
 	"vesta/database/entities"
@@ -85,9 +86,18 @@ func HandlePlaylistSelection(c *gin.Context) {
 			playersPerServer = float64(playerCount)
 		}
 
+		var attributes map[string]interface{}
+		if err := json.Unmarshal([]byte(session.Attributes), &attributes); err != nil {
+			utils.LogError("Failed to unmarshal session attributes: %v", err)
+			c.JSON(500, gin.H{
+				"err": "Failed to get session attributes",
+			})
+			return
+		}
+
 		maxPlayersPerServer := 50
-		if isDefaultPlaylist(playlist) {
-			maxPlayersPerServer = 100
+		if maxPlayers, ok := attributes["MaxPlayers"].(float64); ok {
+			maxPlayersPerServer = int(maxPlayers)
 		}
 
 		needsServer := playersPerServer >= float64(maxPlayersPerServer) || serverCount == 0
@@ -126,7 +136,7 @@ func HandlePlaylistSelection(c *gin.Context) {
 					utils.LogError("Failed to send session assignment: %v", err)
 				}
 			}
-			//				"Playlist": strings.Replace(metric.Playlist, "playlist_", "", 1),
+			//				"Playlist": metric.Playlist,
 
 			c.JSON(200, gin.H{
 				"Playlist": strings.Replace(metric.Playlist, "playlist_", "", 1),
@@ -140,12 +150,4 @@ func HandlePlaylistSelection(c *gin.Context) {
 		"Playlist": nil,
 		"Status":   "WAITING",
 	})
-}
-
-func isDefaultPlaylist(playlist string) bool {
-	return contains(playlist, "playlist_default")
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[0:len(substr)] == substr
 }

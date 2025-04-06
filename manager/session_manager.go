@@ -189,6 +189,7 @@ func PostSessionHeartbeat(c *gin.Context) {
 		c.JSON(404, gin.H{"err": "Session not found"})
 		return
 	}
+
 	session.PlaylistName = body.Playlist
 	session.ServerAddr = body.ServerAddr
 	session.ServerPort = body.ServerPort
