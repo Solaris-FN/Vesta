@@ -34,6 +34,7 @@ func main() {
 		Session.GET("/session/:id/:accountId/player", managers.GetPlayerInSession)
 		Session.POST("/session/:id/start", managers.PostStartSession)
 		Session.POST("/session/:id/close", managers.PostCloseSession)
+		Session.POST("/session/:id/heartbeat", managers.PostSessionHeartbeat)
 		Session.DELETE("/session/:id", managers.DeleteSession)
 	}
 
@@ -50,3 +51,4 @@ func main() {
 		utils.LogWithTimestamp(color.RedString, "Error starting HTTP server: %v", err)
 	}
 }
+

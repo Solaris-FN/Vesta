@@ -149,3 +149,60 @@ func DeleteSession(c *gin.Context) {
 
 	c.JSON(204, nil)
 }
+
+func PostSessionHeartbeat(c *gin.Context) {
+	id := c.Param("id")
+
+	var body struct {
+		Playlist      string `json:"Playlist"`
+		ServerAddr    string `json:"ServerAddr"`
+		ServerPort    int    `json:"ServerPort"`
+		ActivePlayers int    `json:"ActivePlayers"`
+		AllPlayers    int    `json:"AllPlayers"` // set on session close
+		Region        string `json:"Region"`
+		Attributes    struct {
+			Type               string `json:"Type"`
+			BLimitedTimeMode   bool   `json:"bLimitedTimeMode"`
+			RatingType         string `json:"RatingType"`
+			MaxPlayers         int    `json:"MaxPlayers"`
+			MaxTeamCount       int    `json:"MaxTeamCount"`
+			MaxTeamSize        int    `json:"MaxTeamSize"`
+			MaxSocialPartySize int    `json:"MaxSocialPartySize"`
+			MaxSquadSize       int    `json:"MaxSquadSize"`
+		} `json:"Attributes"`
+		Version string `json:"Version"`
+	}
+
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(400, gin.H{"err": err.Error()})
+		return
+	}
+
+	if id == "" {
+		c.JSON(400, gin.H{"err": "Session not found"})
+		return
+	}
+
+	db := database.Get()
+	var session entities.Session
+	if err := db.Where("session = ?", id).First(&session).Error; err != nil {
+		c.JSON(404, gin.H{"err": "Session not found"})
+		return
+	}
+	session.PlaylistName = body.Playlist
+	session.ServerAddr = body.ServerAddr
+	session.ServerPort = body.ServerPort
+	session.ActivePlayers = body.ActivePlayers
+	session.AllPlayers = body.AllPlayers
+	session.Region = body.Region
+	attributes, err := json.Marshal(body.Attributes)
+
+	if err != nil {
+		c.JSON(404, gin.H{"err": "Failed to marshal attributes"})
+		return
+	}
+
+	session.Attributes = string(attributes)
+
+	session.Version = body.Version
+}

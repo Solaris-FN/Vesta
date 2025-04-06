@@ -28,5 +28,7 @@ func GetPlayerInSession(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, player)
+	c.JSON(200, gin.H{
+		"Team": player.Team,
+	})
 }
