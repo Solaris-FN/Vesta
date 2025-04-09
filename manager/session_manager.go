@@ -3,6 +3,7 @@ package managers
 import (
 	"encoding/json"
 	"log"
+	"net/http"
 	"strings"
 	"vesta/database"
 	"vesta/database/entities"
@@ -22,7 +23,6 @@ func PostCreateSession(c *gin.Context) {
 		ServerPort    int    `json:"ServerPort"`
 		ActivePlayers int    `json:"ActivePlayers"`
 		AllPlayers    int    `json:"AllPlayers"`
-		Region        string `json:"Region"`
 		Secret        string `json:"Secret"`
 		Attributes    struct {
 			Type               string `json:"Type"`
@@ -46,6 +46,26 @@ func PostCreateSession(c *gin.Context) {
 
 	db := database.Get()
 
+	resp, err := http.Get("http://ip-api.com/json/" + body.ServerAddr + "?fields=2158591")
+	if err != nil {
+		c.JSON(500, gin.H{"err": "Failed to fetch region from IP API"})
+		return
+	}
+	defer resp.Body.Close()
+
+	var ipRes struct {
+		ContinentCode string `json:"continentCode"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&ipRes); err != nil {
+		c.JSON(500, gin.H{"err": "Failed to decode IP API response"})
+		return
+	}
+
+	if ipRes.ContinentCode == "NA" {
+		ipRes.ContinentCode = "NAE"
+	}
+
 	newSession := entities.Session{
 		Session:       strings.ReplaceAll(uuid.New().String(), "-", ""),
 		PlaylistName:  body.Playlist,
@@ -53,7 +73,7 @@ func PostCreateSession(c *gin.Context) {
 		ServerPort:    body.ServerPort,
 		ActivePlayers: body.ActivePlayers,
 		AllPlayers:    body.AllPlayers,
-		Region:        body.Region,
+		Region:        ipRes.ContinentCode,
 		Secret:        body.Secret,
 		Teams:         pq.StringArray{},
 		Attributes: func() string {
@@ -147,6 +167,11 @@ func DeleteSession(c *gin.Context) {
 		return
 	}
 
+	if err := db.Exec("DELETE FROM vesta_players WHERE session = ?", id).Error; err != nil {
+		c.JSON(404, gin.H{"err": "Players not found or failed to delete"})
+		return
+	}
+
 	c.JSON(204, nil)
 }
 
@@ -204,6 +229,9 @@ func PostSessionHeartbeat(c *gin.Context) {
 	}
 
 	session.Attributes = string(attributes)
-
 	session.Version = body.Version
+
+	db.Save(&session)
+
+	c.JSON(200, &session)
 }
