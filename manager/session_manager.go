@@ -162,12 +162,12 @@ func DeleteSession(c *gin.Context) {
 
 	db := database.Get()
 
-	if err := db.Exec("DELETE FROM vesta_sessions WHERE session = ?", id).Error; err != nil {
+	if err := db.Exec("DELETE FROM vesta_sessions WHERE session = ?", id); err != nil {
 		c.JSON(404, gin.H{"err": "Session not found or failed to delete"})
 		return
 	}
 
-	if err := db.Exec("DELETE FROM vesta_players WHERE session = ?", id).Error; err != nil {
+	if err := db.Exec("DELETE FROM vesta_players WHERE session = ?", id); err != nil {
 		c.JSON(404, gin.H{"err": "Players not found or failed to delete"})
 		return
 	}
@@ -195,7 +195,6 @@ func PostSessionHeartbeat(c *gin.Context) {
 			MaxSocialPartySize int    `json:"MaxSocialPartySize"`
 			MaxSquadSize       int    `json:"MaxSquadSize"`
 		} `json:"Attributes"`
-		Version string `json:"Version"`
 	}
 
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -215,7 +214,7 @@ func PostSessionHeartbeat(c *gin.Context) {
 		return
 	}
 
-	session.PlaylistName = body.Playlist
+	session.PlaylistName = strings.ToLower(body.Playlist)
 	session.ServerAddr = body.ServerAddr
 	session.ServerPort = body.ServerPort
 	session.ActivePlayers = body.ActivePlayers
@@ -229,7 +228,6 @@ func PostSessionHeartbeat(c *gin.Context) {
 	}
 
 	session.Attributes = string(attributes)
-	session.Version = body.Version
 
 	db.Save(&session)
 
