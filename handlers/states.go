@@ -47,7 +47,7 @@ func HandleStates(client Client, ticketId string) error {
 	pingTicker := time.NewTicker(30 * time.Second)
 	defer pingTicker.Stop()
 
-	queueTicker := time.NewTicker(250 * time.Millisecond)
+	queueTicker := time.NewTicker(1 * time.Second)
 	defer queueTicker.Stop()
 
 	done := make(chan struct{})
