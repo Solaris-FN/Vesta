@@ -98,6 +98,27 @@ func HandleStates(client Client, ticketId string) error {
 					}
 					lastSentCount = currentCount
 				}
+			} else {
+				newPlayer := entities.Player{
+					AccountID: client.Payload.AccountID,
+					Session:   updatedSession.Session,
+					Team:      pq.StringArray(strings.Split(client.Payload.PartyPlayerIDs, ",")),
+				}
+
+				if err := db.Create(&newPlayer).Error; err != nil {
+					utils.LogError("Failed to create player: %v", err)
+				}
+
+				if err := messages.SendSessionAssignment(client.Conn, updatedSession.Session); err != nil {
+					utils.LogError("Failed to send session assignment: %v", err)
+				}
+
+				if session.Available {
+					time.Sleep(500 * time.Millisecond)
+					if err := messages.SendJoin(client.Conn, updatedSession.Session, updatedSession.Session); err != nil {
+						utils.LogError("Failed to send join: %v", err)
+					}
+				}
 			}
 		}
 	}
