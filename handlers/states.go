@@ -81,7 +81,9 @@ func HandleStates(client Client, ticketId string) error {
 				return err
 			}
 		case <-queueTicker.C:
-			if result.Error == nil {
+			var updatedSession entities.Session
+			updateResult := db.Where("region = ? AND playlist = ? AND version = ? AND accessible = ?", client.Payload.Region, client.Payload.Playlist, client.Payload.Version, true).First(&updatedSession)
+			if updateResult.Error == nil {
 				currentCount := GetAllClientsViaDataLen(
 					client.Payload.Version,
 					client.Payload.Playlist,
