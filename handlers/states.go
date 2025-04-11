@@ -51,10 +51,13 @@ func HandleStates(client Client, ticketId string) error {
 	defer queueTicker.Stop()
 
 	done := make(chan struct{})
-	defer close(done)
-
 	go func() {
-		defer func() { done <- struct{}{} }()
+		defer func() {
+			select {
+			case done <- struct{}{}:
+			default:
+			}
+		}()
 		for {
 			_, _, err := client.Conn.ReadMessage()
 			if err != nil {
