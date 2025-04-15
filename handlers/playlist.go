@@ -135,7 +135,7 @@ func HandlePlaylistSelection(c *gin.Context) {
 	})
 
 	for _, metric := range metrics {
-		if metric.NeedsServer {
+		if metric.PlayerCount >= 2 && metric.NeedsServer {
 			playlistMutex.Lock()
 			lastSelectedPlaylist[region] = metric.Playlist
 			playlistMutex.Unlock()
