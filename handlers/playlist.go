@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 	"vesta/database"
 	"vesta/database/entities"
 	"vesta/messages"
@@ -14,9 +15,18 @@ import (
 	"github.com/lib/pq"
 )
 
+type PlaylistM struct {
+	Sum         int
+	Hits        int
+	LastUpdated int64
+}
+
 var (
 	lastSelectedPlaylist = make(map[string]string)
 	playlistMutex        sync.RWMutex
+
+	playlistStats      = make(map[string]map[string]*PlaylistM) // region -> playlist -> metrics
+	playlistStatsMutex sync.RWMutex
 )
 
 func HandlePlaylistSelection(c *gin.Context) {
@@ -98,6 +108,22 @@ func HandlePlaylistSelection(c *gin.Context) {
 		wg        sync.WaitGroup
 	)
 
+	playlistStatsMutex.Lock()
+	if _, ok := playlistStats[region]; !ok {
+		playlistStats[region] = make(map[string]*PlaylistM)
+	}
+	currentTime := time.Now().Unix()
+	for playlist, count := range playerCounts {
+		if _, ok := playlistStats[region][playlist]; !ok {
+			playlistStats[region][playlist] = &PlaylistM{Sum: 0, Hits: 0, LastUpdated: currentTime}
+		}
+		stats := playlistStats[region][playlist]
+		stats.Sum += count
+		stats.Hits++
+		stats.LastUpdated = currentTime
+	}
+	playlistStatsMutex.Unlock()
+
 	for playlist, playerCount := range playerCounts {
 		wg.Add(1)
 		go func(playlist string, playerCount int) {
@@ -111,17 +137,32 @@ func HandlePlaylistSelection(c *gin.Context) {
 
 			needsServer := playersPerServer >= float64(maxPlayersPerServer) || serverCount == 0
 
-			metric := Metric{
-				Playlist:         playlist,
-				PlayerCount:      playerCount,
-				ServerCount:      serverCount,
-				PlayersPerServer: playersPerServer,
-				NeedsServer:      needsServer,
+			min := 2
+			playlistStatsMutex.RLock()
+			if stats, ok := playlistStats[region][playlist]; ok && stats.Hits > 0 {
+				if time.Now().Unix()-stats.LastUpdated < 180 {
+					average := float64(stats.Sum) / float64(stats.Hits)
+					calculated := int(average / 2)
+					if calculated > min {
+						min = calculated
+					}
+				}
 			}
+			playlistStatsMutex.RUnlock()
 
-			metricsMu.Lock()
-			metrics = append(metrics, metric)
-			metricsMu.Unlock()
+			if playerCount >= min && needsServer {
+				metric := Metric{
+					Playlist:         playlist,
+					PlayerCount:      playerCount,
+					ServerCount:      serverCount,
+					PlayersPerServer: playersPerServer,
+					NeedsServer:      needsServer,
+				}
+
+				metricsMu.Lock()
+				metrics = append(metrics, metric)
+				metricsMu.Unlock()
+			}
 		}(playlist, playerCount)
 	}
 
@@ -135,35 +176,33 @@ func HandlePlaylistSelection(c *gin.Context) {
 	})
 
 	for _, metric := range metrics {
-		if metric.PlayerCount >= 2 && metric.NeedsServer {
-			playlistMutex.Lock()
-			lastSelectedPlaylist[region] = metric.Playlist
-			playlistMutex.Unlock()
+		playlistMutex.Lock()
+		lastSelectedPlaylist[region] = metric.Playlist
+		playlistMutex.Unlock()
 
-			session.PlaylistName = metric.Playlist
-			db.Save(&session)
+		session.PlaylistName = metric.Playlist
+		db.Save(&session)
 
-			for _, client := range GetAllClientsViaData(session.Version, metric.Playlist, region) {
-				newPlayer := entities.Player{
-					AccountID: client.Payload.AccountID,
-					Session:   session.Session,
-					Team:      pq.StringArray(strings.Split(client.Payload.PartyPlayerIDs, ",")),
-				}
-				if err := db.Create(&newPlayer).Error; err != nil {
-					utils.LogError("failed to create player: %v", err)
-				}
-
-				if err := messages.SendSessionAssignment(client.Conn, id); err != nil {
-					utils.LogError("failed to send session assignment: %v", err)
-				}
+		for _, client := range GetAllClientsViaData(session.Version, metric.Playlist, region) {
+			newPlayer := entities.Player{
+				AccountID: client.Payload.AccountID,
+				Session:   session.Session,
+				Team:      pq.StringArray(strings.Split(client.Payload.PartyPlayerIDs, ",")),
+			}
+			if err := db.Create(&newPlayer).Error; err != nil {
+				utils.LogError("failed to create player: %v", err)
 			}
 
-			c.JSON(200, gin.H{
-				"Playlist": strings.TrimPrefix(metric.Playlist, "playlist_"),
-				"Status":   "OK",
-			})
-			return
+			if err := messages.SendSessionAssignment(client.Conn, id); err != nil {
+				utils.LogError("failed to send session assignment: %v", err)
+			}
 		}
+
+		c.JSON(200, gin.H{
+			"Playlist": strings.TrimPrefix(metric.Playlist, "playlist_"),
+			"Status":   "OK",
+		})
+		return
 	}
 
 	c.JSON(200, gin.H{
