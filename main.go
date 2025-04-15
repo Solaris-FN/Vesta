@@ -23,7 +23,7 @@ func main() {
 
 	db.AutoMigrate(&entities.Session{}, &entities.Player{})
 
-	router := gin.Default() // use gin.Default() if you want a more verbose vesta server
+	router := gin.New() // use gin.Default() if you want a more verbose vesta server
 
 	router.GET("/vesta/conn", handlers.HandleWebSocket)
 
@@ -51,4 +51,3 @@ func main() {
 		utils.LogWithTimestamp(color.RedString, "Error starting HTTP server: %v", err)
 	}
 }
-
