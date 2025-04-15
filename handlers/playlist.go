@@ -29,20 +29,22 @@ func HandlePlaylistSelection(c *gin.Context) {
 		return
 	}
 
+	region := session.Region
+
 	var sessions []entities.Session
-	if err := db.Where("region = ?", session.Region).Find(&sessions).Error; err != nil {
+	if err := db.Where("region = ?", region).Find(&sessions).Error; err != nil {
 		c.JSON(500, gin.H{
-			"err": "Failed to get sessions",
+			"err": "Failed to get sessions for region",
 		})
 		return
 	}
 
-	if _, exists := lastSelectedPlaylist[session.Region]; !exists {
-		lastSelectedPlaylist[session.Region] = "playlist_showdownalt_solo"
+	if _, exists := lastSelectedPlaylist[region]; !exists {
+		lastSelectedPlaylist[region] = "playlist_showdownalt_solo"
 	}
 
-	if lastSelectedPlaylist[session.Region] == "playlist_showdownalt_duos" {
-		lastSelectedPlaylist[session.Region] = "playlist_showdownalt_solo"
+	if lastSelectedPlaylist[region] == "playlist_showdownalt_duos" {
+		lastSelectedPlaylist[region] = "playlist_showdownalt_solo"
 	}
 
 	clientM.RLock()
@@ -50,7 +52,7 @@ func HandlePlaylistSelection(c *gin.Context) {
 
 	playerCounts := make(map[string]int)
 	for client := range clients {
-		if client.Payload.Region == session.Region {
+		if client.Payload.Region == region {
 			playerCounts[client.Payload.Playlist] = playerCounts[client.Payload.Playlist] + 1
 		}
 	}
@@ -113,7 +115,7 @@ func HandlePlaylistSelection(c *gin.Context) {
 
 	for _, metric := range metrics {
 		if metric.NeedsServer {
-			lastSelectedPlaylist[session.Region] = metric.Playlist
+			lastSelectedPlaylist[region] = metric.Playlist
 
 			session.PlaylistName = metric.Playlist
 			db.Save(&session)
@@ -121,7 +123,7 @@ func HandlePlaylistSelection(c *gin.Context) {
 			for _, client := range GetAllClientsViaData(
 				session.Version,
 				metric.Playlist,
-				session.Region,
+				region,
 			) {
 				newPlayer := entities.Player{
 					AccountID: client.Payload.AccountID,
@@ -136,7 +138,6 @@ func HandlePlaylistSelection(c *gin.Context) {
 					utils.LogError("Failed to send session assignment: %v", err)
 				}
 			}
-			//				"Playlist": metric.Playlist,
 
 			c.JSON(200, gin.H{
 				"Playlist": strings.Replace(metric.Playlist, "playlist_", "", 1),
