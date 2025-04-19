@@ -36,6 +36,6 @@ func GetPlayerInSession(c *gin.Context) {
 
 func GetQueuedPlayersTotal(c *gin.Context) {
 	c.JSON(200, gin.H{
-		"Total": handlers.GetAllClients,
+		"Total": len(handlers.GetAllClients()),
 	})
 }
