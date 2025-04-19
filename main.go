@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"time"
 	"vesta/database"
 	"vesta/database/entities"
 	"vesta/handlers"
@@ -18,13 +19,12 @@ func main() {
 	if err != nil {
 		color.Red("Failed to connect to database: %v", err)
 	}
-
 	gin.SetMode(gin.ReleaseMode)
-
 	db.AutoMigrate(&entities.Session{}, &entities.Player{})
 
-	router := gin.New() // use gin.Default() if you want a more verbose vesta server
+	go cleanup()
 
+	router := gin.New() // use gin.Default() if you want a more verbose vesta server
 	router.GET("/vesta/conn", handlers.HandleWebSocket)
 
 	Session := router.Group("/solaris/api/server")
@@ -40,14 +40,52 @@ func main() {
 
 	serverAddr := ":8443"
 	utils.LogWithTimestamp(color.BlueString, "%s", "Vesta started on port "+serverAddr)
-
 	go func() {
 		if err := router.RunTLS(serverAddr, "static/RootCA.key", "static/RootCA.pem"); err != nil {
 			utils.LogWithTimestamp(color.RedString, "Error starting TLS server: %v", err)
 		}
 	}()
-
 	if err := router.Run(":21921"); err != nil {
 		utils.LogWithTimestamp(color.RedString, "Error starting HTTP server: %v", err)
+	}
+}
+
+func cleanup() {
+	db := database.Get()
+	utils.LogWithTimestamp(color.GreenString, "Starting session cleanup")
+
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		utils.LogWithTimestamp(color.YellowString, "Running cleanup check")
+
+		var sessions []entities.Session
+		if err := db.Find(&sessions).Error; err != nil {
+			utils.LogWithTimestamp(color.RedString, "Error fetching sessions: %v", err)
+			continue
+		}
+
+		currentTime := time.Now()
+		cleanupCount := 0
+
+		for _, session := range sessions {
+			if currentTime.Sub(session.UpdatedAt) > 60*time.Second {
+				utils.LogWithTimestamp(color.YellowString, "Deleting session: %s (last active: %v)",
+					session.ID, session.UpdatedAt)
+
+				if err := db.Delete(&session).Error; err != nil {
+					utils.LogWithTimestamp(color.RedString, "Error deleting session %s: %v", session.ID, err)
+				} else {
+					cleanupCount++
+				}
+			}
+		}
+
+		if cleanupCount > 0 {
+			utils.LogWithTimestamp(color.GreenString, "Cleaned up %d sessions", cleanupCount)
+		} else {
+			utils.LogWithTimestamp(color.GreenString, "No sessions found to delete!")
+		}
 	}
 }
