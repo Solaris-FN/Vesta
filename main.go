@@ -66,7 +66,6 @@ func cleanup() {
 			continue
 		}
 
-		currentTime := time.Now()
 		cleanupCount := 0
 
 		playerDiffMap := make(map[string]int)
@@ -79,7 +78,7 @@ func cleanup() {
 			}
 
 			currentPlayerCount := len(players)
-			if previousPlayerCount, exists := playerDiffMap[session.ID]; exists {
+			if previousPlayerCount, exists := playerDiffMap[session.Session]; exists {
 				if previousPlayerCount == currentPlayerCount {
 					utils.LogWithTimestamp(color.YellowString, "Deleting session: %s (players: %d)",
 						session.ID, currentPlayerCount)
@@ -91,8 +90,7 @@ func cleanup() {
 				}
 			}
 
-			playerDiffMap[session.ID] = currentPlayerCount
-		}
+			playerDiffMap[session.Session] = currentPlayerCount
 		}
 
 		if cleanupCount > 0 {
@@ -102,4 +100,3 @@ func cleanup() {
 		}
 	}
 }
-
