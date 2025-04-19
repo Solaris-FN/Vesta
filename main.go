@@ -61,7 +61,7 @@ func cleanup() {
 		utils.LogWithTimestamp(color.YellowString, "Running cleanup check")
 
 		var sessions []entities.Session
-		if err := db.Find(&sessions).Error; err != nil {
+		if err := db.Where("accessible = ?", false).Find(&sessions).Error; err != nil {
 			utils.LogWithTimestamp(color.RedString, "Error fetching sessions: %v", err)
 			continue
 		}
@@ -73,7 +73,7 @@ func cleanup() {
 			if currentTime.Sub(session.UpdatedAt) > 60*time.Second {
 				utils.LogWithTimestamp(color.YellowString, "Deleting session: %s (last active: %v)",
 					session.ID, session.UpdatedAt)
-				if err := db.Exec("DELETE FROM vesta_sessions WHERE session = ?", session.ID).Error; err != nil {
+				if err := db.Exec("DELETE FROM vesta_sessions WHERE session = ? ", session.ID).Error; err != nil {
 					utils.LogWithTimestamp(color.RedString, "Error deleting session %s: %v", session.ID, err)
 				} else {
 					cleanupCount++
