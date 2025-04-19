@@ -61,7 +61,7 @@ func cleanup() {
 		utils.LogWithTimestamp(color.YellowString, "Running cleanup check")
 
 		var sessions []entities.Session
-		if err := db.Where("accessible = ?", false).Find(&sessions).Error; err != nil {
+		if err := db.Find(&sessions).Error; err != nil {
 			utils.LogWithTimestamp(color.RedString, "Error fetching sessions: %v", err)
 			continue
 		}
@@ -69,16 +69,30 @@ func cleanup() {
 		currentTime := time.Now()
 		cleanupCount := 0
 
+		playerDiffMap := make(map[string]int)
+
 		for _, session := range sessions {
-			if currentTime.Sub(session.UpdatedAt) > 60*time.Second {
-				utils.LogWithTimestamp(color.YellowString, "Deleting session: %s (last active: %v)",
-					session.ID, session.UpdatedAt)
-				if err := db.Exec("DELETE FROM vesta_sessions WHERE session = ?", session.Session).Error; err != nil {
-					utils.LogWithTimestamp(color.RedString, "Error deleting session %s: %v", session.ID, err)
-				} else {
-					cleanupCount++
+			var players []entities.Player
+			if err := db.Where("session_id = ?", session.ID).Find(&players).Error; err != nil {
+				utils.LogWithTimestamp(color.RedString, "Error fetching players for session %s: %v", session.ID, err)
+				continue
+			}
+
+			currentPlayerCount := len(players)
+			if previousPlayerCount, exists := playerDiffMap[session.ID]; exists {
+				if previousPlayerCount == currentPlayerCount {
+					utils.LogWithTimestamp(color.YellowString, "Deleting session: %s (players: %d)",
+						session.ID, currentPlayerCount)
+					if err := db.Exec("DELETE FROM vesta_sessions WHERE session = ?", session.Session).Error; err != nil {
+						utils.LogWithTimestamp(color.RedString, "Error deleting session %s: %v", session.ID, err)
+					} else {
+						cleanupCount++
+					}
 				}
 			}
+
+			playerDiffMap[session.ID] = currentPlayerCount
+		}
 		}
 
 		if cleanupCount > 0 {
@@ -88,3 +102,4 @@ func cleanup() {
 		}
 	}
 }
+
