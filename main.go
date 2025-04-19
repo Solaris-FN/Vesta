@@ -71,17 +71,10 @@ func cleanup() {
 		playerDiffMap := make(map[string]int)
 
 		for _, session := range sessions {
-			var players []entities.Player
-			if err := db.Where("session_id = ?", session.ID).Find(&players).Error; err != nil {
-				utils.LogWithTimestamp(color.RedString, "Error fetching players for session %s: %v", session.ID, err)
-				continue
-			}
-
-			currentPlayerCount := len(players)
 			if previousPlayerCount, exists := playerDiffMap[session.Session]; exists {
-				if previousPlayerCount == currentPlayerCount {
+				if previousPlayerCount == session.ActivePlayers {
 					utils.LogWithTimestamp(color.YellowString, "Deleting session: %s (players: %d)",
-						session.ID, currentPlayerCount)
+						session.ID, session.ActivePlayers)
 					if err := db.Exec("DELETE FROM vesta_sessions WHERE session = ?", session.Session).Error; err != nil {
 						utils.LogWithTimestamp(color.RedString, "Error deleting session %s: %v", session.ID, err)
 					} else {
@@ -90,7 +83,7 @@ func cleanup() {
 				}
 			}
 
-			playerDiffMap[session.Session] = currentPlayerCount
+			playerDiffMap[session.Session] = session.ActivePlayers
 		}
 
 		if cleanupCount > 0 {
