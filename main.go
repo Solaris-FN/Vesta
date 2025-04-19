@@ -26,6 +26,7 @@ func main() {
 
 	router := gin.New() // use gin.Default() if you want a more verbose vesta server
 	router.GET("/vesta/conn", handlers.HandleWebSocket)
+	router.GET("/vesta/queue", managers.GetQueuedPlayersTotal)
 
 	Session := router.Group("/solaris/api/server")
 	{

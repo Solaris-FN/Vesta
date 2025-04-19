@@ -115,7 +115,6 @@ func PostStartSession(c *gin.Context) {
 		session.PlaylistName,
 		session.Region,
 	) {
-		log.Printf("Sending session join to client: %s", client.Conn.RemoteAddr())
 		if err := messages.SendJoin(client.Conn, session.Session, session.Session); err != nil {
 			utils.LogError("Failed to send join: %v", err)
 		}

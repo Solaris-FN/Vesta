@@ -3,6 +3,7 @@ package managers
 import (
 	"vesta/database"
 	"vesta/database/entities"
+	"vesta/handlers"
 
 	"github.com/gin-gonic/gin"
 )
@@ -30,5 +31,11 @@ func GetPlayerInSession(c *gin.Context) {
 
 	c.JSON(200, gin.H{
 		"Team": player.Team,
+	})
+}
+
+func GetQueuedPlayersTotal(c *gin.Context) {
+	c.JSON(200, gin.H{
+		"Total": handlers.GetAllClients,
 	})
 }
