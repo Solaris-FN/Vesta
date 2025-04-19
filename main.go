@@ -73,7 +73,7 @@ func cleanup() {
 			if currentTime.Sub(session.UpdatedAt) > 60*time.Second {
 				utils.LogWithTimestamp(color.YellowString, "Deleting session: %s (last active: %v)",
 					session.ID, session.UpdatedAt)
-				if err := db.Exec("DELETE FROM vesta_sessions WHERE session = ? ", session.ID).Error; err != nil {
+				if err := db.Exec("DELETE FROM vesta_sessions WHERE session = ?", session.Session).Error; err != nil {
 					utils.LogWithTimestamp(color.RedString, "Error deleting session %s: %v", session.ID, err)
 				} else {
 					cleanupCount++
