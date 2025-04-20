@@ -55,6 +55,8 @@ func cleanup() {
 	db := database.Get()
 	utils.LogWithTimestamp(color.GreenString, "Starting session cleanup")
 
+	playerDiffMap := make(map[string]int)
+
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -68,8 +70,6 @@ func cleanup() {
 		}
 
 		cleanupCount := 0
-
-		playerDiffMap := make(map[string]int)
 
 		for _, session := range sessions {
 			if previousPlayerCount, exists := playerDiffMap[session.Session]; exists {
