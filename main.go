@@ -73,7 +73,7 @@ func cleanup() {
 
 		for _, session := range sessions {
 			if previousPlayerCount, exists := playerDiffMap[session.Session]; exists {
-				if previousPlayerCount == session.ActivePlayers || session.ActivePlayers == 0 {
+				if previousPlayerCount == session.ActivePlayers && session.AllPlayers > 0 || session.ActivePlayers == 0 && session.AllPlayers > 0 {
 					utils.LogWithTimestamp(color.YellowString, "Deleting session: %s (players: %d)",
 						session.ID, session.ActivePlayers)
 					if err := db.Exec("DELETE FROM vesta_sessions WHERE session = ?", session.Session).Error; err != nil {
