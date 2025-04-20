@@ -57,7 +57,7 @@ func cleanup() {
 
 	playerDiffMap := make(map[string]int)
 
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(2 * time.Minute)
 	defer ticker.Stop()
 
 	for range ticker.C {
