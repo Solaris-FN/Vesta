@@ -46,7 +46,7 @@ func PostCreateSession(c *gin.Context) {
 
 	db := database.Get()
 
-	resp, err := http.Get("http://ip-api.com/json/" + body.ServerAddr + "?fields=2158591")
+	resp, err := http.Get("http://ipwho.is/" + body.ServerAddr)
 	if err != nil {
 		c.JSON(500, gin.H{"err": "Failed to fetch region from IP API"})
 		return
@@ -54,7 +54,7 @@ func PostCreateSession(c *gin.Context) {
 	defer resp.Body.Close()
 
 	var ipRes struct {
-		ContinentCode string `json:"continentCode"`
+		ContinentCode string `json:"continent_code"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&ipRes); err != nil {
