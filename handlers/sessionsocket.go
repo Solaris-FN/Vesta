@@ -36,6 +36,10 @@ type Server struct {
 	MaxPlayers              int      `json:"maxPlayers"`
 }
 
+var (
+	Sessions = make(map[string]*Server)
+)
+
 func HandleSessionWebSocket(c *gin.Context) {
 	w, r := c.Writer, c.Request
 
@@ -108,6 +112,7 @@ func HandleSessionWebSocket(c *gin.Context) {
 	server.MinPlayers = 2
 	server.MaxPlayers = 0
 	server.SessionId = authParts[2]
+	Sessions[server.SessionId] = server
 
 	ws.SetReadLimit(512)
 	ws.SetReadDeadline(time.Now().Add(60 * time.Second))
@@ -154,4 +159,10 @@ func HandleSessionWebSocket(c *gin.Context) {
 			}
 		}
 	}()
+
+	defer func() {
+		ws.Close()
+		delete(Sessions, server.SessionId)
+	}()
+
 }
