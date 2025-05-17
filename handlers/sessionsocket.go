@@ -140,7 +140,7 @@ func HandleSessionWebSocket(c *gin.Context) {
 				if result, ok := payload["result"].(string); ok {
 					if result == "failed" {
 					} else if result == "ready" {
-						utils.LogInfo("Session - %s has AssignedMatch", server.MatchId)
+						utils.LogInfo("Session - %s has AssignedMatch", server.SessionId)
 						go func(s *Server) {
 							time.Sleep(2 * time.Second)
 							s.IsAssigned = true
