@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -109,7 +108,6 @@ func HandleSessionWebSocket(c *gin.Context) {
 	server.MinPlayers = 2
 	server.MaxPlayers = 0
 	server.SessionId = authParts[2]
-	log.Printf("Session - %s has connected", server.SessionId)
 
 	ws.SetReadLimit(512)
 	ws.SetReadDeadline(time.Now().Add(60 * time.Second))
