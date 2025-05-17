@@ -160,20 +160,17 @@ func HandleSessionWebSocket(c *gin.Context) {
 		}
 	}()
 
-	defer func() {
-		ws.Close()
-		delete(Sessions, server.SessionId)
-	}()
-
 	ticker := time.NewTicker(30 * time.Millisecond)
 	defer ticker.Stop()
 
 	go func() {
-		for range ticker.C {
-			if err := ws.WriteMessage(websocket.PongMessage, nil); err != nil {
-				utils.LogError("failed to send ping: %v", err)
-				ws.Close()
-				return
+		for {
+			select {
+			case <-ticker.C:
+				if err := ws.WriteMessage(websocket.TextMessage, []byte{}); err != nil {
+					utils.LogError("failed to send ping: %v", err)
+					return
+				}
 			}
 		}
 	}()
