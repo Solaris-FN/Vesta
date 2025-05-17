@@ -1,12 +1,15 @@
 package handlers
 
 import (
+	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 	"vesta/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -21,6 +24,17 @@ type Server struct {
 		Iat           int64       `json:"iat"`
 		Jti           string      `json:"jti"`
 	}
+	MatchId                 string   `json:"matchId"`
+	SessionId               string   `json:"sessionId"`
+	IsAssigned              bool     `json:"isAssigned"`
+	IsAssigning             bool     `json:"isAssigning"`
+	StopAllowingConnections bool     `json:"stopAllowingConnections"`
+	Playlist                string   `json:"playlist"`
+	Teams                   []string `json:"teams"`
+	IsSending               bool     `json:"isSending"`
+	AssignMatchSent         bool     `json:"assignMatchSent"`
+	MinPlayers              int      `json:"minPlayers"`
+	MaxPlayers              int      `json:"maxPlayers"`
 }
 
 func HandleSessionWebSocket(c *gin.Context) {
@@ -28,12 +42,14 @@ func HandleSessionWebSocket(c *gin.Context) {
 
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		utils.LogError("failed to upgrade connection: %v", err)
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
+		utils.LogError("Authorization header is missing")
 		c.AbortWithStatus(http.StatusUnauthorized)
 		ws.Close()
 		return
@@ -41,16 +57,17 @@ func HandleSessionWebSocket(c *gin.Context) {
 
 	authParts := strings.SplitN(authHeader, " ", 4)
 	if len(authParts) != 4 || authParts[0] != "Epic-Signed" || authParts[1] != "Vesta-Sessions" {
+		utils.LogError("Invalid Authorization header format")
 		c.AbortWithStatus(http.StatusUnauthorized)
 		ws.Close()
 		return
 	}
 
 	const JWT_SECRET = "vmkt7lob4n0purvn7n96c3tk8vb5o2a4hu1a8fqisa1xx718bx808ns5si1jhm98qlycpzk8us0b57j8gt5td1c42c1us9ww"
-	token := authParts[2] + "." + strings.SplitN(authParts[3], " ", 2)[0]
 
-	payload, err := utils.VerifyJWT(token, JWT_SECRET)
+	payload, err := utils.VerifyJWT(authParts[3], JWT_SECRET)
 	if err != nil {
+		utils.LogError("failed to verify JWT: %v", err)
 		c.AbortWithStatus(http.StatusUnauthorized)
 		ws.Close()
 		return
@@ -81,6 +98,19 @@ func HandleSessionWebSocket(c *gin.Context) {
 		server.Payload.Jti = jti
 	}
 
+	server.MatchId = uuid.New().String()
+	server.IsAssigned = false
+	server.IsAssigning = false
+	server.StopAllowingConnections = false
+	server.Playlist = ""
+	server.Teams = make([]string, 0)
+	server.IsSending = false
+	server.AssignMatchSent = false
+	server.MinPlayers = 2
+	server.MaxPlayers = 0
+	server.SessionId = authParts[2]
+	log.Printf("Session - %s has connected", server.SessionId)
+
 	ws.SetReadLimit(512)
 	ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 	ws.SetPongHandler(func(string) error {
@@ -88,4 +118,42 @@ func HandleSessionWebSocket(c *gin.Context) {
 		return nil
 	})
 
+	ws.WriteMessage(websocket.TextMessage, []byte(`{"name":"Registered","payload":{}}`))
+
+	go func() {
+		for {
+			_, message, err := ws.ReadMessage()
+			if err != nil {
+				utils.LogError("failed to read message: %v", err)
+				break
+			}
+			var data map[string]interface{}
+			if err := json.Unmarshal(message, &data); err != nil {
+				utils.LogError("failed to decode message: %v", err)
+				ws.Close()
+				return
+			}
+
+			if name, ok := data["name"].(string); ok && name == "AssignMatchResult" {
+				payload, ok := data["payload"].(map[string]interface{})
+				if !ok {
+					return
+				}
+				if result, ok := payload["result"].(string); ok {
+					if result == "failed" {
+					} else if result == "ready" {
+						utils.LogInfo("Session - %s has AssignedMatch", server.MatchId)
+						go func(s *Server) {
+							time.Sleep(2 * time.Second)
+							s.IsAssigned = true
+						}(server)
+						go func(s *Server) {
+							time.Sleep(3 * time.Second)
+							s.StopAllowingConnections = true
+						}(server)
+					}
+				}
+			}
+		}
+	}()
 }
