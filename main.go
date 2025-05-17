@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
+	"os"
 	"time"
 	"vesta/database"
 	"vesta/database/entities"
@@ -22,10 +24,29 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	db.AutoMigrate(&entities.Session{}, &entities.Player{})
 
+	configFile, err := os.Open("./static/config.json")
+	if err != nil {
+		color.Red("Failed to read config: %v", err)
+	}
+	defer configFile.Close()
+
+	var config map[string]interface{}
+	decoder := json.NewDecoder(configFile)
+	if err := decoder.Decode(&config); err != nil {
+		color.Red("Failed to decode config: %v", err)
+	}
+
 	go cleanup()
 
-	router := gin.New() // use gin.Default() if you want a more verbose vesta server
+	var router *gin.Engine
+	if verbose, ok := config["Verbose"].(bool); ok && verbose {
+		router = gin.Default()
+	} else {
+		router = gin.New()
+	}
+
 	router.GET("/vesta/conn", handlers.HandleWebSocket)
+	router.GET("/vesta/session", handlers.HandleSessionWebSocket)
 	router.GET("/vesta/queue", managers.GetQueuedPlayersTotal)
 
 	Session := router.Group("/solaris/api/server")
