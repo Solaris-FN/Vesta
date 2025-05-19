@@ -2,9 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 	"time"
+	"vesta/classes"
+	"vesta/messages"
 	"vesta/utils"
 
 	"github.com/gin-gonic/gin"
@@ -12,32 +15,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type Server struct {
-	Conn    *websocket.Conn
-	Payload struct {
-		BucketID      interface{} `json:"bucketId"`
-		Region        string      `json:"region"`
-		Version       string      `json:"version"`
-		BuildUniqueID string      `json:"buildUniqueId"`
-		Exp           int64       `json:"exp"`
-		Iat           int64       `json:"iat"`
-		Jti           string      `json:"jti"`
-	}
-	MatchId                 string   `json:"matchId"`
-	SessionId               string   `json:"sessionId"`
-	IsAssigned              bool     `json:"isAssigned"`
-	IsAssigning             bool     `json:"isAssigning"`
-	StopAllowingConnections bool     `json:"stopAllowingConnections"`
-	Playlist                string   `json:"playlist"`
-	Teams                   []string `json:"teams"`
-	IsSending               bool     `json:"isSending"`
-	AssignMatchSent         bool     `json:"assignMatchSent"`
-	MinPlayers              int      `json:"minPlayers"`
-	MaxPlayers              int      `json:"maxPlayers"`
-}
-
 var (
-	Sessions = make(map[string]*Server)
+	Sessions = make(map[string]*classes.Server)
 )
 
 func HandleSessionWebSocket(c *gin.Context) {
@@ -76,7 +55,7 @@ func HandleSessionWebSocket(c *gin.Context) {
 		return
 	}
 
-	server := &Server{
+	server := &classes.Server{
 		Conn: ws,
 	}
 	if bucketID, ok := payload["bucketId"].(string); ok {
@@ -106,7 +85,6 @@ func HandleSessionWebSocket(c *gin.Context) {
 	server.IsAssigning = false
 	server.StopAllowingConnections = false
 	server.Playlist = ""
-	server.Teams = make([]string, 0)
 	server.IsSending = false
 	server.AssignMatchSent = false
 	server.MinPlayers = 2
@@ -123,55 +101,76 @@ func HandleSessionWebSocket(c *gin.Context) {
 
 	ws.WriteMessage(websocket.TextMessage, []byte(`{"name":"Registered","payload":{}}`))
 
-	go func() {
-		for {
-			_, message, err := ws.ReadMessage()
-			if err != nil {
-				utils.LogError("failed to read message: %v", err)
-				break
-			}
-			var data map[string]interface{}
-			if err := json.Unmarshal(message, &data); err != nil {
-				utils.LogError("failed to decode message: %v", err)
-				ws.Close()
-				return
-			}
+	done := make(chan struct{})
 
-			if name, ok := data["name"].(string); ok && name == "AssignMatchResult" {
-				payload, ok := data["payload"].(map[string]interface{})
-				if !ok {
-					return
-				}
-				if result, ok := payload["result"].(string); ok {
-					if result == "failed" {
-					} else if result == "ready" {
-						utils.LogInfo("Session - %s has AssignedMatch", server.SessionId)
-						go func(s *Server) {
-							time.Sleep(2 * time.Second)
-							s.IsAssigned = true
-						}(server)
-						go func(s *Server) {
-							time.Sleep(3 * time.Second)
-							s.StopAllowingConnections = true
-						}(server)
-					}
-				}
-			}
-		}
-	}()
+	defer close(done)
 
 	ticker := time.NewTicker(30 * time.Millisecond)
-	defer ticker.Stop()
 
 	go func() {
+		defer ticker.Stop()
+
 		for {
 			select {
 			case <-ticker.C:
-				if err := ws.WriteMessage(websocket.TextMessage, []byte{}); err != nil {
-					utils.LogError("failed to send ping: %v", err)
+				log.Printf("Ticker fired. IsAssigned: %v, IsSending: %v, IsAssigning: %v",
+					server.IsAssigned, server.IsSending, server.IsAssigning)
+
+				if !server.IsSending && !server.IsAssigning {
+					SelectPlaylist(server.SessionId, server.Payload.Region)
+					log.Printf("Session - %s has selected a playlist", server.SessionId)
+				} else {
+					log.Printf("Conditions not met, stopping ticker")
 					return
 				}
+			case <-done:
+				log.Printf("Connection closed, stopping ticker")
+				return
 			}
 		}
 	}()
+
+	for {
+		_, message, err := ws.ReadMessage()
+		if err != nil {
+			utils.LogError("failed to read message: %v", err)
+			break
+		}
+		log.Printf("Received message: %s", message)
+		var data map[string]interface{}
+		if err := json.Unmarshal(message, &data); err != nil {
+			if string(message) != "ping" {
+				utils.LogError("failed to decode message: %v", err)
+				close(done)
+			}
+			return
+		}
+
+		if name, ok := data["name"].(string); ok && name == "AssignMatchResult" {
+			payload, ok := data["payload"].(map[string]interface{})
+			if !ok {
+				return
+			}
+			if result, ok := payload["result"].(string); ok {
+				if result == "failed" {
+				} else if result == "ready" {
+					utils.LogInfo("Session - %s has AssignedMatch", server.SessionId)
+
+					time.Sleep(2 * time.Second)
+					server.IsAssigned = true
+					for _, client := range GetAllClientsViaData(
+						server.Payload.Version,
+						server.Playlist,
+						server.Payload.Region,
+					) {
+						if err := messages.SendJoin(client.Conn, server.SessionId, server.SessionId); err != nil {
+							utils.LogError("Failed to send join: %v", err)
+						}
+					}
+					time.Sleep(3 * time.Second)
+					server.StopAllowingConnections = true
+				}
+			}
+		}
+	}
 }

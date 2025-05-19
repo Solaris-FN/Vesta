@@ -136,7 +136,7 @@ func HandleWebSocket(c *gin.Context) {
 	ClientM.Unlock()
 	currentCount := GetAllClientsViaDataLen(client.Payload.Version, client.Payload.Playlist, client.Payload.Region)
 
-	utils.LogSuccess("%s", fmt.Sprintf("Connection established from %s! Current count: %d", r.RemoteAddr, currentCount))
+	utils.LogSuccess("%s", fmt.Sprintf("Connection established from %s! Current count: %d", c.ClientIP(), currentCount))
 
 	ticketID := strings.ReplaceAll(uuid.New().String(), "-", "")
 
