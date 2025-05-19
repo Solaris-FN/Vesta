@@ -47,7 +47,7 @@ func HandleStates(client Client, ticketId string) error {
 		}
 	} else if classes.Config["FortniteSessions"] == true {
 		var session entities.MMSessions
-		result := db.Where("region = ? AND playlist_name = ?", client.Payload.Region, client.Payload.Playlist).First(&session)
+		result := db.Where("region = ? AND playlist_name = ? AND started = ?", client.Payload.Region, client.Payload.Playlist, false).First(&session)
 		if result.Error != nil {
 			if result.Error.Error() != "record not found" {
 				log.Printf("Error fetching session: %v", result.Error)
@@ -124,7 +124,7 @@ func HandleStates(client Client, ticketId string) error {
 
 			if classes.Config["FortniteSessions"] == true {
 				var updatedSession entities.MMSessions
-				updateResult := db.Where("region = ? AND playlist_name = ?", client.Payload.Region, client.Payload.Playlist).First(&updatedSession)
+				updateResult := db.Where("region = ? AND playlist_name = ? AND started = ?", client.Payload.Region, client.Payload.Playlist, false).First(&updatedSession)
 				if updateResult.Error != nil {
 					currentCount := GetAllClientsViaDataLen(
 						client.Payload.Version,
