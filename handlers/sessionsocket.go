@@ -169,8 +169,6 @@ func HandleSessionWebSocket(c *gin.Context) {
 							if client != nil && client.Conn != nil {
 								if err := messages.SendJoin(client.Conn, server.SessionId, server.SessionId); err != nil {
 									utils.LogError("Failed to send join: %v", err)
-								} else {
-									utils.LogInfo("Successfully sent join to client %d", i)
 								}
 							} else {
 								utils.LogInfo("Client %d is nil or has nil connection", i)

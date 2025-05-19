@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"time"
+	"vesta/classes"
 	"vesta/database"
 	"vesta/database/entities"
 	"vesta/handlers"
@@ -30,16 +31,15 @@ func main() {
 	}
 	defer configFile.Close()
 
-	var config map[string]interface{}
 	decoder := json.NewDecoder(configFile)
-	if err := decoder.Decode(&config); err != nil {
+	if err := decoder.Decode(&classes.Config); err != nil {
 		color.Red("Failed to decode config: %v", err)
 	}
 
 	go cleanup()
 
 	var router *gin.Engine
-	if verbose, ok := config["Verbose"].(bool); ok && verbose {
+	if verbose, ok := classes.Config["Verbose"].(bool); ok && verbose {
 		router = gin.Default()
 	} else {
 		router = gin.New()
