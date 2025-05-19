@@ -59,11 +59,11 @@ func HandlePlaylistSelection(c *gin.Context) {
 	}
 	playlistMutex.Unlock()
 
-	clientM.RLock()
-	defer clientM.RUnlock()
+	ClientM.RLock()
+	defer ClientM.RUnlock()
 
 	playerCounts := make(map[string]int)
-	for client := range clients {
+	for client := range Clients {
 		if client.Payload.Region == region {
 			playerCounts[client.Payload.Playlist]++
 		}

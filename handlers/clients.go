@@ -5,22 +5,22 @@ import (
 )
 
 func GetAllClients() []*websocket.Conn {
-	clientM.RLock()
-	defer clientM.RUnlock()
+	ClientM.RLock()
+	defer ClientM.RUnlock()
 
 	var connList []*websocket.Conn
-	for client := range clients {
+	for client := range Clients {
 		connList = append(connList, client.Conn)
 	}
 	return connList
 }
 
 func GetAllClientsViaData(version string, playlist string, region string) []*Client {
-	clientM.RLock()
-	defer clientM.RUnlock()
+	ClientM.RLock()
+	defer ClientM.RUnlock()
 
 	var connList []*Client
-	for client := range clients {
+	for client := range Clients {
 		if client.Payload.Version == version && client.Payload.Playlist == playlist && client.Payload.Region == region {
 			connList = append(connList, client)
 		}
@@ -30,11 +30,11 @@ func GetAllClientsViaData(version string, playlist string, region string) []*Cli
 }
 
 func GetAllClientsViaDataLen(version string, playlist string, region string) int {
-	clientM.RLock()
-	defer clientM.RUnlock()
+	ClientM.RLock()
+	defer ClientM.RUnlock()
 
 	var connList []*Client
-	for client := range clients {
+	for client := range Clients {
 		if client.Payload.Version == version && client.Payload.Playlist == playlist && client.Payload.Region == region {
 			connList = append(connList, client)
 		}

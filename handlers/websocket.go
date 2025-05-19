@@ -39,8 +39,8 @@ var (
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 	}
-	clients = make(map[*Client]bool)
-	clientM sync.RWMutex
+	Clients = make(map[*Client]bool)
+	ClientM sync.RWMutex
 )
 
 func HandleWebSocket(c *gin.Context) {
@@ -131,9 +131,9 @@ func HandleWebSocket(c *gin.Context) {
 		return nil
 	})
 
-	clientM.Lock()
-	clients[client] = true
-	clientM.Unlock()
+	ClientM.Lock()
+	Clients[client] = true
+	ClientM.Unlock()
 	currentCount := GetAllClientsViaDataLen(client.Payload.Version, client.Payload.Playlist, client.Payload.Region)
 
 	utils.LogSuccess("%s", fmt.Sprintf("Connection established from %s! Current count: %d", r.RemoteAddr, currentCount))
@@ -142,9 +142,9 @@ func HandleWebSocket(c *gin.Context) {
 
 	if err := sendInitMessages(ws, ticketID, currentCount); err != nil {
 		log.Printf("Failed to send init messages: %v", err)
-		clientM.Lock()
-		delete(clients, client)
-		clientM.Unlock()
+		ClientM.Lock()
+		delete(Clients, client)
+		ClientM.Unlock()
 		ws.Close()
 		return
 	}
@@ -153,9 +153,9 @@ func HandleWebSocket(c *gin.Context) {
 		log.Printf("HandleStates failed: %v", err)
 	}
 
-	clientM.Lock()
-	delete(clients, client)
-	clientM.Unlock()
+	ClientM.Lock()
+	delete(Clients, client)
+	ClientM.Unlock()
 	ws.Close()
 
 	utils.LogInfo("%s", fmt.Sprintf("Client disconnected from %s!", r.RemoteAddr))

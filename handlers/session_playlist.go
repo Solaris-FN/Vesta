@@ -41,14 +41,14 @@ func SelectPlaylist(sessionID string, region string) (string, string, error) {
 	}
 	playlistMutex.Unlock()
 
-	clientM.RLock()
+	ClientM.RLock()
 	playerCounts := make(map[string]int)
-	for client := range clients {
+	for client := range Clients {
 		if client.Payload.Region == region {
 			playerCounts[client.Payload.Playlist]++
 		}
 	}
-	clientM.RUnlock()
+	ClientM.RUnlock()
 
 	if len(playerCounts) == 0 {
 		return "", "WAITING", nil
@@ -171,4 +171,3 @@ func SelectPlaylist(sessionID string, region string) (string, string, error) {
 
 	return "", "WAITING", nil
 }
-
