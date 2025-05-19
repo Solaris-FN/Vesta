@@ -158,15 +158,28 @@ func HandleSessionWebSocket(c *gin.Context) {
 
 					time.Sleep(2 * time.Second)
 					server.IsAssigned = true
-					for _, client := range GetAllClientsViaData(
+					clients := GetAllClientsViaData(
 						server.Payload.Version,
 						server.Playlist,
 						server.Payload.Region,
-					) {
-						if err := messages.SendJoin(client.Conn, server.SessionId, server.SessionId); err != nil {
-							utils.LogError("Failed to send join: %v", err)
+					)
+					if clients != nil {
+						for i, client := range clients {
+							utils.LogInfo("Processing client %d for session %s", i, server.SessionId)
+							if client != nil && client.Conn != nil {
+								if err := messages.SendJoin(client.Conn, server.SessionId, server.SessionId); err != nil {
+									utils.LogError("Failed to send join: %v", err)
+								} else {
+									utils.LogInfo("Successfully sent join to client %d", i)
+								}
+							} else {
+								utils.LogInfo("Client %d is nil or has nil connection", i)
+							}
 						}
+					} else {
+						utils.LogError("No clients found for session %s, playlist %s, region %s, version %s", server.SessionId, server.Playlist, server.Payload.Region, server.Payload.Version)
 					}
+
 					time.Sleep(3 * time.Second)
 					server.StopAllowingConnections = true
 				}

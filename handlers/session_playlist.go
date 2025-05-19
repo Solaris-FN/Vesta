@@ -163,6 +163,7 @@ func SelectPlaylist(sessionID string, region string) (string, string, error) {
 		playlistMutex.Unlock()
 
 		session.PlaylistName = metric.Playlist
+		Sessions[session.SessionId].Playlist = metric.Playlist
 		db.Save(&session)
 		for _, player := range players {
 			sesh := Sessions[session.SessionId]
@@ -262,4 +263,3 @@ func SelectPlaylist(sessionID string, region string) (string, string, error) {
 
 	return "", "WAITING", nil
 }
-
