@@ -45,7 +45,7 @@ func HandleStates(client Client, ticketId string) error {
 				}
 			}
 		}
-	} else if classes.Config["FortniteSessions"] == true {
+	} else {
 		var session entities.MMSessions
 		result := db.Where("region = ? AND playlist_name = ? AND started = ?", client.Payload.Region, client.Payload.Playlist, false).First(&session)
 		if result.Error != nil {
@@ -120,9 +120,7 @@ func HandleStates(client Client, ticketId string) error {
 						lastSentCount = currentCount
 					}
 				}
-			}
-
-			if classes.Config["FortniteSessions"] == true {
+			} else {
 				var updatedSession entities.MMSessions
 				updateResult := db.Where("region = ? AND playlist_name = ? AND started = ?", client.Payload.Region, client.Payload.Playlist, false).First(&updatedSession)
 				if updateResult.Error != nil {

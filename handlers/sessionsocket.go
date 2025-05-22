@@ -105,7 +105,7 @@ func HandleSessionWebSocket(c *gin.Context) {
 
 	defer close(done)
 
-	ticker := time.NewTicker(30 * time.Millisecond)
+	ticker := time.NewTicker(100 * time.Millisecond)
 
 	go func() {
 		defer ticker.Stop()
