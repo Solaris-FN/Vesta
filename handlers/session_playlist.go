@@ -119,7 +119,7 @@ func SelectPlaylist(sessionID string, region string) (string, string, error) {
 
 			needsServer := playersPerServer >= float64(maxPlayersPerServer) || serverCount == 0
 
-			min := 1
+			min := 2
 			playlistStatsMutex.RLock()
 			if stats, ok := playlistStats[region][playlist]; ok && stats.Hits > 0 {
 				if time.Now().Unix()-stats.LastUpdated < 180 {

@@ -101,9 +101,10 @@ func HandleSessionWebSocket(c *gin.Context) {
 
 	ws.WriteMessage(websocket.TextMessage, []byte(`{"name":"Registered","payload":{}}`))
 
-	done := make(chan struct{})
-
-	defer close(done)
+	defer func() {
+		utils.LogInfo("Cleaning up session: %s", server.SessionId)
+		delete(Sessions, server.SessionId)
+	}()
 
 	for {
 		_, message, err := ws.ReadMessage()
@@ -112,19 +113,21 @@ func HandleSessionWebSocket(c *gin.Context) {
 			break
 		}
 		log.Printf("Received message: %s", message)
+
+		if string(message) == "ping" {
+			continue
+		}
+
 		var data map[string]interface{}
 		if err := json.Unmarshal(message, &data); err != nil {
-			if string(message) != "ping" {
-				utils.LogError("failed to decode message: %v", err)
-				close(done)
-			}
-			return
+			utils.LogError("failed to decode message: %v", err)
+			break
 		}
 
 		if name, ok := data["name"].(string); ok && name == "AssignMatchResult" {
 			payload, ok := data["payload"].(map[string]interface{})
 			if !ok {
-				return
+				continue
 			}
 			if result, ok := payload["result"].(string); ok {
 				if result == "failed" {
