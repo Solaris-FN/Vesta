@@ -105,31 +105,6 @@ func HandleSessionWebSocket(c *gin.Context) {
 
 	defer close(done)
 
-	ticker := time.NewTicker(100 * time.Millisecond)
-
-	go func() {
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				log.Printf("Ticker fired. IsAssigned: %v, IsSending: %v, IsAssigning: %v",
-					server.IsAssigned, server.IsSending, server.IsAssigning)
-
-				if !server.IsSending && !server.IsAssigning {
-					SelectPlaylist(server.SessionId, server.Payload.Region)
-					log.Printf("Session - %s has selected a playlist", server.SessionId)
-				} else {
-					log.Printf("Conditions not met, stopping ticker")
-					return
-				}
-			case <-done:
-				log.Printf("Connection closed, stopping ticker")
-				return
-			}
-		}
-	}()
-
 	for {
 		_, message, err := ws.ReadMessage()
 		if err != nil {
@@ -155,9 +130,9 @@ func HandleSessionWebSocket(c *gin.Context) {
 				if result == "failed" {
 				} else if result == "ready" {
 					utils.LogInfo("Session - %s has AssignedMatch", server.SessionId)
-
 					time.Sleep(2 * time.Second)
 					server.IsAssigned = true
+					//	server.IsSending = false
 					clients := GetAllClientsViaData(
 						server.Payload.Version,
 						server.Playlist,
@@ -180,6 +155,7 @@ func HandleSessionWebSocket(c *gin.Context) {
 
 					time.Sleep(3 * time.Second)
 					server.StopAllowingConnections = true
+					//			ws.WriteMessage(websocket.TextMessage, []byte(`{"name":"AwaitingBackfill","payload":{}}`))
 				}
 			}
 		}

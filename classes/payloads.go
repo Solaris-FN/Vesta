@@ -13,3 +13,14 @@ type AssignMatchPayloadData struct {
 	Spectators     []interface{}          `json:"spectators"`
 	Teams          [][][]string           `json:"teams"`
 }
+
+type BackfillMatchPayload struct {
+	Name    string                   `json:"name"`
+	Payload BackfillMatchPayloadData `json:"payload"`
+}
+
+type BackfillMatchPayloadData struct {
+	Teams           [][][]string           `json:"teams"`
+	BackfillId      string                 `json:"backfillId"`
+	BackfillOptions map[string]interface{} `json:"backfillOptions"`
+}
