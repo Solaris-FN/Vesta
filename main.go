@@ -84,7 +84,7 @@ func cleanup() {
 	for range ticker.C {
 		utils.LogWithTimestamp(color.YellowString, "Running cleanup check")
 
-		var sessions []entities.Session
+		var sessions []entities.MMSessions
 		if err := db.Find(&sessions).Error; err != nil {
 			utils.LogWithTimestamp(color.RedString, "Error fetching sessions: %v", err)
 			continue
@@ -93,19 +93,23 @@ func cleanup() {
 		cleanupCount := 0
 
 		for _, session := range sessions {
-			if previousPlayerCount, exists := playerDiffMap[session.Session]; exists {
-				if previousPlayerCount == session.ActivePlayers && session.AllPlayers > 0 || session.ActivePlayers == 0 && session.AllPlayers > 0 {
-					utils.LogWithTimestamp(color.YellowString, "Deleting session: %s (players: %d)",
-						session.ID, session.ActivePlayers)
-					if err := db.Exec("DELETE FROM vesta_sessions WHERE session = ?", session.Session).Error; err != nil {
-						utils.LogWithTimestamp(color.RedString, "Error deleting session %s: %v", session.ID, err)
-					} else {
-						cleanupCount++
+			if previousPlayerCount, exists := playerDiffMap[session.SessionId]; exists {
+				for _, server := range handlers.Sessions {
+					if server.SessionId == session.SessionId {
+						if previousPlayerCount == len(session.PublicPlayers) && len(server.Teams) > 0 || len(session.PublicPlayers) == 0 && len(server.Teams) > 0 {
+							utils.LogWithTimestamp(color.YellowString, "Deleting session: %s (players: %d)",
+								session.ID, len(session.PublicPlayers))
+							if err := db.Exec("DELETE FROM mmsessions WHERE session_id = ?", session.SessionId).Error; err != nil {
+								utils.LogWithTimestamp(color.RedString, "Error deleting session %s: %v", session.ID, err)
+							} else {
+								cleanupCount++
+							}
+						}
 					}
 				}
 			}
 
-			playerDiffMap[session.Session] = session.ActivePlayers
+			playerDiffMap[session.SessionId] = len(session.PublicPlayers)
 		}
 
 		if cleanupCount > 0 {

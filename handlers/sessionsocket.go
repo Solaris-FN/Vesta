@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -17,6 +18,13 @@ import (
 
 var (
 	Sessions = make(map[string]*classes.Server)
+)
+
+const (
+	writeWait      = 10 * time.Second
+	pongWait       = 60 * time.Second
+	pingPeriod     = (pongWait * 9) / 10
+	maxMessageSize = 512
 )
 
 func HandleSessionWebSocket(c *gin.Context) {
@@ -58,6 +66,7 @@ func HandleSessionWebSocket(c *gin.Context) {
 	server := &classes.Server{
 		Conn: ws,
 	}
+
 	if bucketID, ok := payload["bucketId"].(string); ok {
 		server.Payload.BucketID = bucketID
 	}
@@ -92,73 +101,116 @@ func HandleSessionWebSocket(c *gin.Context) {
 	server.SessionId = authParts[2]
 	Sessions[server.SessionId] = server
 
-	ws.SetReadLimit(512)
-	ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+	ws.SetReadLimit(maxMessageSize)
+	ws.SetReadDeadline(time.Now().Add(pongWait))
 	ws.SetPongHandler(func(string) error {
-		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+		ws.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
 
 	ws.WriteMessage(websocket.TextMessage, []byte(`{"name":"Registered","payload":{}}`))
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		ticker := time.NewTicker(pingPeriod)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				ws.SetWriteDeadline(time.Now().Add(writeWait))
+				if err := ws.WriteMessage(websocket.PingMessage, nil); err != nil {
+					utils.LogError("failed to send ping: %v", err)
+					cancel()
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
 	defer func() {
 		utils.LogInfo("Cleaning up session: %s", server.SessionId)
 		delete(Sessions, server.SessionId)
+		ws.Close()
 	}()
 
 	for {
-		_, message, err := ws.ReadMessage()
-		if err != nil {
-			utils.LogError("failed to read message: %v", err)
-			break
-		}
-		log.Printf("Received message: %s", message)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			_, message, err := ws.ReadMessage()
+			if err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+					utils.LogError("websocket error: %v", err)
+				} else {
+					utils.LogInfo("websocket connection closed: %v", err)
+				}
+				return
+			}
 
-		if string(message) == "ping" {
-			continue
-		}
+			log.Printf("Received message: %s", message)
 
-		var data map[string]interface{}
-		if err := json.Unmarshal(message, &data); err != nil {
-			utils.LogError("failed to decode message: %v", err)
-			break
-		}
-
-		if name, ok := data["name"].(string); ok && name == "AssignMatchResult" {
-			payload, ok := data["payload"].(map[string]interface{})
-			if !ok {
+			if string(message) == "ping" {
+				ws.SetWriteDeadline(time.Now().Add(writeWait))
+				if err := ws.WriteMessage(websocket.TextMessage, []byte("pong")); err != nil {
+					utils.LogError("failed to send pong: %v", err)
+					return
+				}
 				continue
 			}
-			if result, ok := payload["result"].(string); ok {
-				if result == "failed" {
-				} else if result == "ready" {
-					utils.LogInfo("Session - %s has AssignedMatch", server.SessionId)
-					time.Sleep(2 * time.Second)
-					server.IsAssigned = true
-					//	server.IsSending = false
-					clients := GetAllClientsViaData(
-						server.Payload.Version,
-						server.Playlist,
-						server.Payload.Region,
-					)
-					if clients != nil {
-						for i, client := range clients {
-							utils.LogInfo("Processing client %d for session %s", i, server.SessionId)
-							if client != nil && client.Conn != nil {
-								if err := messages.SendJoin(client.Conn, server.SessionId, server.SessionId); err != nil {
-									utils.LogError("Failed to send join: %v", err)
+
+			var data map[string]interface{}
+			if err := json.Unmarshal(message, &data); err != nil {
+				utils.LogError("failed to decode message: %v", err)
+				continue
+			}
+
+			if name, ok := data["name"].(string); ok && name == "AssignMatchResult" {
+				payload, ok := data["payload"].(map[string]interface{})
+				if !ok {
+					continue
+				}
+				if result, ok := payload["result"].(string); ok {
+					if result == "failed" {
+						utils.LogInfo("Match assignment failed for session %s", server.SessionId)
+					} else if result == "ready" {
+						utils.LogInfo("Session - %s has AssignedMatch", server.SessionId)
+
+						go func() {
+							time.Sleep(2 * time.Second)
+							server.IsAssigned = true
+
+							clients := GetAllClientsViaData(
+								server.Payload.Version,
+								server.Playlist,
+								server.Payload.Region,
+							)
+
+							if clients != nil {
+								for i, client := range clients {
+									utils.LogInfo("Processing client %d for session %s", i, server.SessionId)
+									if client != nil && client.Conn != nil {
+										if err := messages.SendJoin(client.Conn, server.SessionId, server.SessionId); err != nil {
+											utils.LogError("Failed to send join: %v", err)
+										}
+									} else {
+										utils.LogInfo("Client %d is nil or has nil connection", i)
+									}
 								}
 							} else {
-								utils.LogInfo("Client %d is nil or has nil connection", i)
+								utils.LogError("No clients found for session %s, playlist %s, region %s, version %s",
+									server.SessionId, server.Playlist, server.Payload.Region, server.Payload.Version)
 							}
-						}
-					} else {
-						utils.LogError("No clients found for session %s, playlist %s, region %s, version %s", server.SessionId, server.Playlist, server.Payload.Region, server.Payload.Version)
-					}
 
-					time.Sleep(3 * time.Second)
-					server.StopAllowingConnections = true
-					//			ws.WriteMessage(websocket.TextMessage, []byte(`{"name":"AwaitingBackfill","payload":{}}`))
+							time.Sleep(3 * time.Second)
+							server.StopAllowingConnections = true
+						}()
+					}
 				}
 			}
 		}
