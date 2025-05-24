@@ -229,6 +229,7 @@ func SelectPlaylist(sessionID string, region string) (string, string, error) {
 			Sessions[session.SessionId] = sesh
 		}
 		Sessions[sessionID].IsAssigning = true
+		Sessions[sessionID].IsSending = true
 		time.Sleep(2000 * time.Millisecond)
 
 		payload := classes.AssignMatchPayload{
@@ -248,8 +249,12 @@ func SelectPlaylist(sessionID string, region string) (string, string, error) {
 			log.Printf("failed to marshal AssignMatch payload: %v", err)
 		}
 
-		if err := Sessions[sessionID].Conn.WriteMessage(1, msg); err != nil {
-			log.Printf("failed to send AssignMatch message: %v", err)
+		if !Sessions[sessionID].AssignMatchSent {
+			if err := Sessions[sessionID].Conn.WriteMessage(1, msg); err != nil {
+				log.Printf("failed to send AssignMatch message: %v", err)
+			} else {
+				Sessions[sessionID].AssignMatchSent = true
+			}
 		}
 
 		for _, client := range GetAllClientsViaData(Sessions[session.SessionId].Payload.Version, metric.Playlist, region) {
