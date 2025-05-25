@@ -23,7 +23,7 @@ func main() {
 		color.Red("Failed to connect to database: %v", err)
 	}
 	gin.SetMode(gin.ReleaseMode)
-	db.AutoMigrate(&entities.Session{}, &entities.Player{})
+	db.AutoMigrate(&entities.Session{}, &entities.Player{}, &entities.MMSessions{})
 
 	configFile, err := os.Open("./static/config.json")
 	if err != nil {
@@ -75,38 +75,62 @@ func main() {
 func cleanup() {
 	db := database.Get()
 	utils.LogWithTimestamp(color.GreenString, "Starting session cleanup")
-
 	playerDiffMap := make(map[string]int)
-
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(2 * time.Minute)
 	defer ticker.Stop()
 
 	for range ticker.C {
 		utils.LogWithTimestamp(color.YellowString, "Running cleanup check")
-
 		var sessions []entities.MMSessions
 		if err := db.Find(&sessions).Error; err != nil {
 			utils.LogWithTimestamp(color.RedString, "Error fetching sessions: %v", err)
 			continue
 		}
 
+		utils.LogWithTimestamp(color.YellowString, "Found %d sessions in database", len(sessions))
 		cleanupCount := 0
 
 		for _, session := range sessions {
+			utils.LogWithTimestamp(color.YellowString, "Checking session %s (players: %d)",
+				session.SessionId, len(session.PublicPlayers))
+
 			if previousPlayerCount, exists := playerDiffMap[session.SessionId]; exists {
+				utils.LogWithTimestamp(color.YellowString, "Previous player count for %s: %d, current: %d",
+					session.SessionId, previousPlayerCount, len(session.PublicPlayers))
+
+				var foundServer *classes.Server
 				for _, server := range handlers.Sessions {
 					if server.SessionId == session.SessionId {
-						if previousPlayerCount == len(session.PublicPlayers) && len(server.Teams) > 0 || len(session.PublicPlayers) == 0 && len(server.Teams) > 0 {
-							utils.LogWithTimestamp(color.YellowString, "Deleting session: %s (players: %d)",
-								session.ID, len(session.PublicPlayers))
-							if err := db.Exec("DELETE FROM mmsessions WHERE session_id = ?", session.SessionId).Error; err != nil {
-								utils.LogWithTimestamp(color.RedString, "Error deleting session %s: %v", session.ID, err)
-							} else {
-								cleanupCount++
-							}
-						}
+						foundServer = server
+						break
 					}
 				}
+
+				if foundServer != nil {
+					utils.LogWithTimestamp(color.YellowString, "Found server for session %s (teams: %d)",
+						session.SessionId, len(foundServer.Teams))
+
+					shouldDelete := (previousPlayerCount == len(session.PublicPlayers))
+
+					utils.LogWithTimestamp(color.YellowString, "Should delete session %s: %v", session.SessionId, shouldDelete)
+
+					if shouldDelete {
+						utils.LogWithTimestamp(color.YellowString, "Deleting session: %s (players: %d)",
+							session.ID, len(session.PublicPlayers))
+						if err := db.Exec("DELETE FROM mmsessions WHERE session_id = ?", session.SessionId).Error; err != nil {
+							utils.LogWithTimestamp(color.RedString, "Error deleting session %s: %v", session.ID, err)
+						} else {
+							cleanupCount++
+						}
+					}
+				} else {
+					utils.LogWithTimestamp(color.YellowString, "No server found for session %s", session.SessionId)
+					if err := db.Exec("DELETE FROM mmsessions WHERE session_id = ?", session.SessionId).Error; err != nil {
+						utils.LogWithTimestamp(color.RedString, "Error deleting session %s: %v", session.ID, err)
+					}
+				}
+			} else {
+				utils.LogWithTimestamp(color.YellowString, "No previous data for session %s", session.SessionId)
 			}
 
 			playerDiffMap[session.SessionId] = len(session.PublicPlayers)

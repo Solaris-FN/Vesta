@@ -92,7 +92,6 @@ func HandleStates(client Client, ticketId string) error {
 					if server.Payload.Region == client.Payload.Region {
 						if !server.IsSending && !server.IsAssigning {
 							SelectPlaylist(server.SessionId, server.Payload.Region)
-							log.Printf("Session - %s has selected a playlist", server.SessionId)
 						} else if !server.IsSending && server.IsAssigned && server.StopAllowingConnections {
 							// sesh := Sessions[server.SessionId]
 							// if sesh == nil {
