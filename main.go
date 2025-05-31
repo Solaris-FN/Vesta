@@ -93,7 +93,10 @@ func cleanup() {
 		for _, session := range sessions {
 			utils.LogWithTimestamp(color.YellowString, "Checking session %s (players: %d)",
 				session.SessionId, len(session.PublicPlayers))
-
+			if len(session.PublicPlayers) == 0 {
+				utils.LogWithTimestamp(color.YellowString, "Skipping session %s because it has 0 players", session.SessionId)
+				continue
+			}
 			if previousPlayerCount, exists := playerDiffMap[session.SessionId]; exists {
 				utils.LogWithTimestamp(color.YellowString, "Previous player count for %s: %d, current: %d",
 					session.SessionId, previousPlayerCount, len(session.PublicPlayers))

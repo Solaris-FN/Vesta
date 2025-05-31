@@ -255,6 +255,7 @@ func SelectPlaylist(sessionID string, region string) (string, string, error) {
 			} else {
 				Sessions[sessionID].AssignMatchSent = true
 			}
+
 		}
 
 		for _, client := range GetAllClientsViaData(Sessions[session.SessionId].Payload.Version, metric.Playlist, region) {
