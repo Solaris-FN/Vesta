@@ -93,10 +93,17 @@ func cleanup() {
 		for _, session := range sessions {
 			utils.LogWithTimestamp(color.YellowString, "Checking session %s (players: %d)",
 				session.SessionId, len(session.PublicPlayers))
-			if len(session.PublicPlayers) == 0 {
+			lastUpdatedTime, err := time.Parse(time.RFC3339, session.LastUpdated)
+			if err != nil {
+				utils.LogWithTimestamp(color.RedString, "Error parsing LastUpdated for session %s: %v", session.SessionId, err)
+				continue
+			}
+
+			if time.Since(lastUpdatedTime) > 10*time.Minute {
 				utils.LogWithTimestamp(color.YellowString, "Skipping session %s because it has 0 players", session.SessionId)
 				continue
 			}
+
 			if previousPlayerCount, exists := playerDiffMap[session.SessionId]; exists {
 				utils.LogWithTimestamp(color.YellowString, "Previous player count for %s: %d, current: %d",
 					session.SessionId, previousPlayerCount, len(session.PublicPlayers))
