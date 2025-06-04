@@ -119,10 +119,10 @@ func SelectPlaylist(sessionID string, region string) (string, string, error) {
 
 			needsServer := playersPerServer >= float64(maxPlayersPerServer) || serverCount == 0
 
-			min := 2
+			min := 1
 			playlistStatsMutex.RLock()
 			if stats, ok := playlistStats[region][playlist]; ok && stats.Hits > 0 {
-				if time.Now().Unix()-stats.LastUpdated < 180 {
+				if currentTime-stats.LastUpdated < 100 {
 					average := float64(stats.Sum) / float64(stats.Hits)
 					calculated := int(average / 2)
 					if calculated > min {
@@ -163,8 +163,11 @@ func SelectPlaylist(sessionID string, region string) (string, string, error) {
 		playlistMutex.Unlock()
 
 		session.PlaylistName = metric.Playlist
-		Sessions[session.SessionId].Playlist = metric.Playlist
+		if Sessions[session.SessionId] != nil {
+			Sessions[session.SessionId].Playlist = metric.Playlist
+		}
 		db.Save(&session)
+
 		for _, player := range players {
 			sesh := Sessions[session.SessionId]
 			if sesh == nil {
@@ -228,8 +231,11 @@ func SelectPlaylist(sessionID string, region string) (string, string, error) {
 
 			Sessions[session.SessionId] = sesh
 		}
-		Sessions[sessionID].IsAssigning = true
-		Sessions[sessionID].IsSending = true
+
+		if Sessions[sessionID] != nil {
+			Sessions[sessionID].IsAssigning = true
+			Sessions[sessionID].IsSending = true
+		}
 		time.Sleep(2000 * time.Millisecond)
 
 		payload := classes.AssignMatchPayload{
@@ -249,13 +255,12 @@ func SelectPlaylist(sessionID string, region string) (string, string, error) {
 			log.Printf("failed to marshal AssignMatch payload: %v", err)
 		}
 
-		if !Sessions[sessionID].AssignMatchSent {
+		if Sessions[sessionID] != nil && !Sessions[sessionID].AssignMatchSent {
 			if err := Sessions[sessionID].Conn.WriteMessage(1, msg); err != nil {
 				log.Printf("failed to send AssignMatch message: %v", err)
 			} else {
 				Sessions[sessionID].AssignMatchSent = true
 			}
-
 		}
 
 		for _, client := range GetAllClientsViaData(Sessions[session.SessionId].Payload.Version, metric.Playlist, region) {

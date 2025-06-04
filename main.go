@@ -93,14 +93,45 @@ func cleanup() {
 		for _, session := range sessions {
 			utils.LogWithTimestamp(color.YellowString, "Checking session %s (players: %d)",
 				session.SessionId, len(session.PublicPlayers))
+
 			lastUpdatedTime, err := time.Parse(time.RFC3339, session.LastUpdated)
 			if err != nil {
 				utils.LogWithTimestamp(color.RedString, "Error parsing LastUpdated for session %s: %v", session.SessionId, err)
 				continue
 			}
 
-			if time.Since(lastUpdatedTime) > 10*time.Minute {
-				utils.LogWithTimestamp(color.YellowString, "Skipping session %s because it has 0 players", session.SessionId)
+			var foundServer *classes.Server
+			for _, server := range handlers.Sessions {
+				if server.SessionId == session.SessionId {
+					foundServer = server
+					break
+				}
+			}
+
+			if time.Since(lastUpdatedTime) > 30*time.Minute {
+				utils.LogWithTimestamp(color.YellowString, "Session %s is older than 10 minutes, cleaning up", session.SessionId)
+				if foundServer != nil {
+					foundServer.Conn.Close()
+				}
+				if err := db.Exec("DELETE FROM mmsessions WHERE session_id = ?", session.SessionId).Error; err != nil {
+					utils.LogWithTimestamp(color.RedString, "Error deleting old session %s: %v", session.SessionId, err)
+				} else {
+					cleanupCount++
+				}
+				continue
+			}
+
+			if len(session.PublicPlayers) == 0 {
+				if foundServer == nil {
+					utils.LogWithTimestamp(color.YellowString, "Session %s has 0 players and no active connection, deleting", session.SessionId)
+					if err := db.Exec("DELETE FROM mmsessions WHERE session_id = ?", session.SessionId).Error; err != nil {
+						utils.LogWithTimestamp(color.RedString, "Error deleting empty session %s: %v", session.SessionId, err)
+					} else {
+						cleanupCount++
+					}
+				} else {
+					utils.LogWithTimestamp(color.YellowString, "Session %s has 0 players but active connection, keeping", session.SessionId)
+				}
 				continue
 			}
 
@@ -108,35 +139,37 @@ func cleanup() {
 				utils.LogWithTimestamp(color.YellowString, "Previous player count for %s: %d, current: %d",
 					session.SessionId, previousPlayerCount, len(session.PublicPlayers))
 
-				var foundServer *classes.Server
-				for _, server := range handlers.Sessions {
-					if server.SessionId == session.SessionId {
-						foundServer = server
-						break
-					}
-				}
-
 				if foundServer != nil {
 					utils.LogWithTimestamp(color.YellowString, "Found server for session %s (teams: %d)",
 						session.SessionId, len(foundServer.Teams))
 
-					shouldDelete := (previousPlayerCount == len(session.PublicPlayers))
+					shouldDelete := (previousPlayerCount == len(session.PublicPlayers)) &&
+						time.Since(lastUpdatedTime) > 30*time.Minute
 
 					utils.LogWithTimestamp(color.YellowString, "Should delete session %s: %v", session.SessionId, shouldDelete)
 
 					if shouldDelete {
-						utils.LogWithTimestamp(color.YellowString, "Deleting session: %s (players: %d)",
-							session.ID, len(session.PublicPlayers))
+						utils.LogWithTimestamp(color.YellowString, "Deleting stagnant session: %s (players: %d)",
+							session.SessionId, len(session.PublicPlayers))
+						if foundServer.Conn != nil {
+							foundServer.Conn.Close()
+						}
 						if err := db.Exec("DELETE FROM mmsessions WHERE session_id = ?", session.SessionId).Error; err != nil {
-							utils.LogWithTimestamp(color.RedString, "Error deleting session %s: %v", session.ID, err)
+							utils.LogWithTimestamp(color.RedString, "Error deleting session %s: %v", session.SessionId, err)
 						} else {
 							cleanupCount++
 						}
 					}
 				} else {
-					utils.LogWithTimestamp(color.YellowString, "No server found for session %s", session.SessionId)
-					if err := db.Exec("DELETE FROM mmsessions WHERE session_id = ?", session.SessionId).Error; err != nil {
-						utils.LogWithTimestamp(color.RedString, "Error deleting session %s: %v", session.ID, err)
+					utils.LogWithTimestamp(color.YellowString, "Session %s has players but no server connection", session.SessionId)
+					if time.Since(lastUpdatedTime) > 3*time.Minute {
+						utils.LogWithTimestamp(color.YellowString, "Cleaning up orphaned session %s", session.SessionId)
+						if err := db.Exec("DELETE FROM mmsessions WHERE session_id = ?", session.SessionId).Error; err != nil {
+							utils.LogWithTimestamp(color.RedString, "Error deleting orphaned session %s: %v", session.SessionId, err)
+						} else {
+							cleanupCount++
+							delete(handlers.Sessions, session.SessionId)
+						}
 					}
 				}
 			} else {
