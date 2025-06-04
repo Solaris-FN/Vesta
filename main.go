@@ -108,8 +108,8 @@ func cleanup() {
 				}
 			}
 
-			if time.Since(lastUpdatedTime) > 30*time.Minute {
-				utils.LogWithTimestamp(color.YellowString, "Session %s is older than 10 minutes, cleaning up", session.SessionId)
+			if time.Since(lastUpdatedTime) > 2*time.Minute {
+				utils.LogWithTimestamp(color.YellowString, "Session %s is older than 2 minutes, cleaning up", session.SessionId)
 				if foundServer != nil {
 					foundServer.Conn.Close()
 				}
@@ -144,7 +144,7 @@ func cleanup() {
 						session.SessionId, len(foundServer.Teams))
 
 					shouldDelete := (previousPlayerCount == len(session.PublicPlayers)) &&
-						time.Since(lastUpdatedTime) > 30*time.Minute
+						time.Since(lastUpdatedTime) > 5*time.Minute
 
 					utils.LogWithTimestamp(color.YellowString, "Should delete session %s: %v", session.SessionId, shouldDelete)
 
