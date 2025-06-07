@@ -50,7 +50,7 @@ func HandleStates(client Client, ticketId string) error {
 	pingTicker := time.NewTicker(30 * time.Second)
 	defer pingTicker.Stop()
 
-	queueTicker := time.NewTicker(1 * time.Second)
+	queueTicker := time.NewTicker(500 * time.Millisecond)
 	defer queueTicker.Stop()
 
 	done := make(chan struct{})
@@ -92,7 +92,8 @@ func HandleStates(client Client, ticketId string) error {
 					if server.Payload.Region == client.Payload.Region {
 						if !server.IsSending && !server.IsAssigning {
 							SelectPlaylist(server.SessionId, server.Payload.Region)
-						} else if !server.IsSending && server.IsAssigned && server.StopAllowingConnections {
+						} else if server.IsSending && server.IsAssigning {
+							queueTicker.Stop()
 							// sesh := Sessions[server.SessionId]
 							// if sesh == nil {
 							// 	log.Printf("session not found in memory: %+v", server.SessionId)

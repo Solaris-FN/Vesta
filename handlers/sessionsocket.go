@@ -203,6 +203,7 @@ func HandleSessionWebSocket(c *gin.Context) {
 									for i, client := range clients {
 										utils.LogInfo("Processing client %d for session %s", i, server.SessionId)
 										if client != nil && client.Conn != nil {
+											time.Sleep(100 * time.Millisecond)
 											if err := messages.SendJoin(client.Conn, server.SessionId, server.SessionId); err != nil {
 												utils.LogError("Failed to send join: %v", err)
 											}
