@@ -87,13 +87,14 @@ func HandleStates(client Client, ticketId string) error {
 				return err
 			}
 		case <-queueTicker.C:
+			sendQueue := true
 			for _, server := range Sessions {
 				if server != nil {
 					if server.Payload.Region == client.Payload.Region {
 						if !server.IsSending && !server.IsAssigning {
 							SelectPlaylist(server.SessionId, server.Payload.Region)
 						} else if server.IsSending && server.IsAssigning {
-							queueTicker.Stop()
+							sendQueue = false
 							// sesh := Sessions[server.SessionId]
 							// if sesh == nil {
 							// 	log.Printf("session not found in memory: %+v", server.SessionId)
@@ -192,20 +193,22 @@ func HandleStates(client Client, ticketId string) error {
 					}
 				}
 			} else {
-				var updatedSession entities.MMSessions
-				updateResult := db.Where("region = ? AND playlist = ? AND started = ?", client.Payload.Region, client.Payload.Playlist, false).First(&updatedSession)
+				if sendQueue {
+					var updatedSession entities.MMSessions
+					updateResult := db.Where("region = ? AND playlist = ? AND started = ?", client.Payload.Region, client.Payload.Playlist, false).First(&updatedSession)
 
-				if updateResult.Error != nil {
-					currentCount := GetAllClientsViaDataLen(
-						client.Payload.Version,
-						client.Payload.Playlist,
-						client.Payload.Region,
-					)
-					if currentCount != lastSentCount {
-						if err := messages.SendQueued(client.Conn, ticketId, currentCount); err != nil {
-							return err
+					if updateResult.Error != nil {
+						currentCount := GetAllClientsViaDataLen(
+							client.Payload.Version,
+							client.Payload.Playlist,
+							client.Payload.Region,
+						)
+						if currentCount != lastSentCount {
+							if err := messages.SendQueued(client.Conn, ticketId, currentCount); err != nil {
+								return err
+							}
+							lastSentCount = currentCount
 						}
-						lastSentCount = currentCount
 					}
 				}
 			}
